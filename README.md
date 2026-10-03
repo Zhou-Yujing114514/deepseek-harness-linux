@@ -40,6 +40,19 @@ pnpm dsh web
 
 `pnpm run build` prepares the repository artifacts. `pnpm dsh web` uses those built artifacts without rebuilding.
 
+### Desktop on Linux
+
+The Desktop application can be packaged for Linux on an Ubuntu 24.04 (or compatible) host:
+
+```sh
+pnpm install
+cp apps/desktop/.env.linux.example apps/desktop/.env.linux   # then fill in the release settings
+pnpm --dir apps/desktop run package:linux:x64                # AppImage for x64
+pnpm --dir apps/desktop run package:linux:arm64              # AppImage for arm64
+```
+
+Electron-builder needs FUSE 2 (`libfuse2`) on the build host to assemble an AppImage. The Linux build is unsigned and updates go through the same `electron-updater` AppImage channel. See [the Desktop packaging notes](apps/desktop/README.md) for release versions, uploads, and per-target environment files.
+
 ## Community and support
 
 - Submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).

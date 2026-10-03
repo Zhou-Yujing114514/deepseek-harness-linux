@@ -44,6 +44,19 @@ pnpm dsh web
 
 `pnpm run build` 会准备仓库产物。`pnpm dsh web` 会直接使用这些已构建产物，不会重新构建。
 
+### Linux 桌面端
+
+桌面应用可在 Ubuntu 24.04（或兼容发行版）上打包为 Linux 版本：
+
+```sh
+pnpm install
+cp apps/desktop/.env.linux.example apps/desktop/.env.linux   # 然后填入发布配置
+pnpm --dir apps/desktop run package:linux:x64                # 生成 x64 AppImage
+pnpm --dir apps/desktop run package:linux:arm64              # 生成 arm64 AppImage
+```
+
+打包 AppImage 时构建机需要 FUSE 2（`libfuse2`）。Linux 构建不做代码签名，更新走 `electron-updater` 的 AppImage 渠道。发布版本号、上传与各平台环境变量文件详见[桌面端打包说明](apps/desktop/README.md)。
+
 ## 社区与支持
 
 - 通过 [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) 提交反馈或 bug 报告。

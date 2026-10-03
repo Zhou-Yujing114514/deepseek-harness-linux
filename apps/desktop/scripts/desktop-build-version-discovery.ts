@@ -31,7 +31,7 @@ const LISTING_DEADLINE_MS = 8_000
 const LISTING_PAGE_SIZE = 1000
 
 /** Artifact name electron-builder writes for one build, on either platform; unsigned Windows builds add a suffix. */
-const ARTIFACT = /(?:^|\/)deepseek-harness-(?<version>.+)-(?:mac|win)-(?:arm64|x64)(?:-unsigned)?\.(?:exe|dmg|zip)$/u
+const ARTIFACT = /(?:^|\/)deepseek-harness-(?<version>.+)-(?:mac|win|linux)-(?:arm64|x64)(?:-unsigned)?\.(?:exe|dmg|zip|AppImage)$/u
 
 /** Inputs that decide which versions are already taken. */
 export interface DesktopBuildVersionSuggestionOptions {
@@ -87,8 +87,9 @@ async function localVersions(artifactsRoot: string): Promise<string[]> {
  * @returns Versions parsed from object names, or undefined when the bucket cannot be listed completely in time.
  */
 async function remoteVersions(options: DesktopBuildVersionSuggestionOptions): Promise<string[] | undefined> {
-  const platform = options.target === 'win-x64' ? 'win32' as const : 'darwin' as const
-  const arch = options.target === 'mac-arm64' ? 'arm64' : 'x64'
+  const platform = options.target === 'win-x64' ? 'win32' as const
+    : options.target === 'linux-x64' || options.target === 'linux-arm64' ? 'linux' as const : 'darwin' as const
+  const arch = options.target === 'mac-arm64' || options.target === 'linux-arm64' ? 'arm64' : 'x64'
   // An unconfigured destination has nothing to be unique against; an invalid one must not be mistaken for it.
   if (options.environment[DESKTOP_AUTO_UPDATE_ENV] === undefined
     && options.environment.DOWNLOAD_TEST_ORIGIN === undefined) return undefined

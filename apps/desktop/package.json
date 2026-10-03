@@ -33,12 +33,20 @@
     "package:win:x64": "tsx scripts/package-target.ts win-x64",
     "package:win:x64:unsigned": "tsx scripts/package-target.ts win-x64 --unsigned",
     "package:win:x64:dir": "tsx scripts/package-target.ts win-x64 --dir",
+    "package:linux:x64": "tsx scripts/package-target.ts linux-x64",
+    "package:linux:x64:dir": "tsx scripts/package-target.ts linux-x64 --dir",
+    "package:linux:arm64": "tsx scripts/package-target.ts linux-arm64",
+    "package:linux:arm64:dir": "tsx scripts/package-target.ts linux-arm64 --dir",
     "upload:mac:arm64": "tsx scripts/upload-target.ts mac-arm64",
     "upload:mac:x64": "tsx scripts/upload-target.ts mac-x64",
     "upload:win:x64": "tsx scripts/upload-target.ts win-x64",
+    "upload:linux:x64": "tsx scripts/upload-target.ts linux-x64",
+    "upload:linux:arm64": "tsx scripts/upload-target.ts linux-arm64",
     "upload:latest:mac:arm64": "tsx scripts/upload-target.ts mac-arm64 --latest",
     "upload:latest:mac:x64": "tsx scripts/upload-target.ts mac-x64 --latest",
-    "upload:latest:win:x64": "tsx scripts/upload-target.ts win-x64 --latest"
+    "upload:latest:win:x64": "tsx scripts/upload-target.ts win-x64 --latest",
+    "upload:latest:linux:x64": "tsx scripts/upload-target.ts linux-x64 --latest",
+    "upload:latest:linux:arm64": "tsx scripts/upload-target.ts linux-arm64 --latest"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

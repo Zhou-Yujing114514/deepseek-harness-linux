@@ -48,7 +48,7 @@ async function fixture(
   await writeFile(join(repositoryRoot, 'package.json'), `${JSON.stringify({ version })}\n`)
   await writeFile(join(appRoot, 'package.json'), `${JSON.stringify({ version })}\n`)
 
-  const [os, arch] = target.split('-') as ['mac' | 'win', 'arm64' | 'x64']
+  const [os, arch] = target.split('-') as ['mac' | 'win' | 'linux', 'arm64' | 'x64']
   const base = `deepseek-harness-${version}-${os}-${arch}`
   const origin = environment === 'test'
     ? TEST_ORIGIN
@@ -70,6 +70,21 @@ async function fixture(
       version,
       path: `${base}.zip`,
       files: [{ url: `${base}.zip`, size: Buffer.byteLength(zip), sha512: digest(zip) }],
+    })}\n`)
+  }
+  else if (os === 'linux') {
+    const executable = 'signed AppImage fixture'
+    await writeFile(join(artifactsRoot, `${base}.AppImage`), executable)
+    const info = await createBlockmap(join(artifactsRoot, `${base}.AppImage`), {},
+      { info: { emitArtifactBuildCompleted: async () => {} } }, `${base}.AppImage`)
+    expect(Object.hasOwn(info, 'blockMapSize')).toBe(false)
+    await writeFile(join(artifactsRoot, desktopUpdateMetadataFilename(version, 'linux')), `${JSON.stringify({
+      version,
+      path: `${base}.AppImage`,
+      files: [{
+        url: `${base}.AppImage`,
+        ...info,
+      }],
     })}\n`)
   }
   else {
@@ -116,7 +131,7 @@ describe('desktop upload plan', () => {
   it('uploads only the selected latest installer to each deployment using the existing COS transport', async () => {
     const published = []
     for (const environment of ['production', 'test'] as const) {
-      for (const target of ['mac-arm64', 'mac-x64', 'win-x64'] as const) {
+      for (const target of ['mac-arm64', 'mac-x64', 'win-x64', 'linux-x64', 'linux-arm64'] as const) {
         const paths = await fixture(target, '1.2.3', environment)
         const plan = await createDesktopUploadPlan(target, { ...paths, latest: true })
         const loopback = await startCosLoopback()
@@ -212,11 +227,12 @@ describe('desktop upload plan', () => {
     })
   })
 
-  it.each(['mac-arm64', 'mac-x64', 'win-x64'] as const)('publishes every %s object and YAML reference inside the test release directory', async (target) => {
+  it.each(['mac-arm64', 'mac-x64', 'win-x64', 'linux-x64', 'linux-arm64'] as const)('publishes every %s object and YAML reference inside the test release directory', async (target) => {
     const paths = await fixture(target)
     const plan = await createDesktopUploadPlan(target, paths)
     const prefix = `dsh-desk/${RELEASE_ID}`
-    const payload = plan.artifacts.find(artifact => artifact.filename.endsWith(target === 'win-x64' ? '.exe' : '.zip'))!
+    const payloadExtension = target === 'win-x64' ? '.exe' : target.startsWith('linux') ? '.AppImage' : '.zip'
+    const payload = plan.artifacts.find(artifact => artifact.filename.endsWith(payloadExtension))!
     for (const artifact of plan.artifacts) {
       expect(artifact.key).toBe(`${prefix}/${artifact.channelMetadata ? 'feeds' : 'bin'}/${target}/${artifact.filename}`)
       if (artifact.channelMetadata) {

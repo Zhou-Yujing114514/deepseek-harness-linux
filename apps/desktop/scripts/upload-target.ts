@@ -10,7 +10,7 @@ import { createDesktopUploadPlan, type DesktopUploadPlan } from './desktop-uploa
 import { desktopReleaseTag, tagDesktopRelease } from './desktop-release-tag.ts'
 import { uploadDesktopRelease } from './desktop-upload-run.ts'
 
-const SUPPORTED_TARGETS = new Set<DesktopPackageTargetName>(['mac-arm64', 'mac-x64', 'win-x64'])
+const SUPPORTED_TARGETS = new Set<DesktopPackageTargetName>(['mac-arm64', 'mac-x64', 'win-x64', 'linux-x64', 'linux-arm64'])
 
 function targetName(value: string): DesktopPackageTargetName {
   if (!SUPPORTED_TARGETS.has(value as DesktopPackageTargetName)) {
@@ -41,8 +41,8 @@ export function resolveCredentialUploadEnvironment(
   selected: 'test' | 'production', bucket: string,
   target: DesktopPackageTargetName,
 ): NodeJS.ProcessEnv {
-  const platform = target === 'win-x64' ? 'win32' : 'darwin'
-  const arch = target === 'mac-arm64' ? 'arm64' : 'x64'
+  const platform = target === 'win-x64' ? 'win32' : target === 'linux-x64' || target === 'linux-arm64' ? 'linux' : 'darwin'
+  const arch = target === 'mac-arm64' || target === 'linux-arm64' ? 'arm64' : 'x64'
   const destination = resolveDesktopUploadConfig(fileEnvironment, platform, arch)
   if (destination.environment !== selected || destination.bucket !== bucket) {
     throw new Error('desktop upload: credential launcher deployment or bucket differs from the packaged release destination')
@@ -73,7 +73,8 @@ export async function uploadDesktopTarget(args: string[]): Promise<void> {
     throw new Error('desktop upload: expected exactly one target')
   }
   const name = targetName(target)
-  const fileEnvironment = loadDesktopPackageEnvironment(name === 'win-x64' ? 'win32' : 'darwin')
+  const fileEnvironment = loadDesktopPackageEnvironment(
+    name === 'win-x64' ? 'win32' : name === 'linux-x64' || name === 'linux-arm64' ? 'linux' : 'darwin')
   const launcher = values['credential-launcher'] === true
   if (launcher ? values.environment === undefined || values.bucket === undefined
     : values.environment !== undefined || values.bucket !== undefined) {

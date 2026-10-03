@@ -1,0 +1,143 @@
+# Package the Linux Desktop application (AppImage) on an Ubuntu runner.
+#
+# The upstream release pipeline targets macOS and Windows only; this workflow
+# exercises the Linux packaging path added by the deepseek-harness-linux
+# adaptation. Packaging is intentionally manual (workflow_dispatch) and
+# produces unsigned AppImage artifacts for manual review: Linux builds carry
+# no code-signing stage and are uploaded through the same COS pipeline only
+# when an operator runs `pnpm --dir apps/desktop run upload:linux:*`.
+name: Desktop (Linux)
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: Linux architecture to package
+        type: choice
+        options: [x64, arm64]
+        default: x64
+
+permissions:
+  contents: read
+
+env:
+  PRIMARY_NODE_VERSION: '24'
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  check:
+    name: Validate Linux packaging configuration
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Configure pnpm store path
+        id: pnpm-store
+        run: |
+          store_root="$HOME/.local/share/pnpm/store"
+          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
+          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare Linux release settings
+        run: |
+          cp apps/desktop/.env.linux.example apps/desktop/.env.linux
+          sed -i 's|^DOWNLOAD_TEST_ORIGIN=.*|DOWNLOAD_TEST_ORIGIN=https://downloads.example.invalid|' apps/desktop/.env.linux
+          sed -i 's|^DOWNLOAD_TEST_RELEASE_ID=.*|DOWNLOAD_TEST_RELEASE_ID=0123456789abcdef0123456789abcdef|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
+
+      - name: Validate packaging configuration and toolchain
+        run: pnpm --dir apps/desktop run check:package
+
+  package:
+    name: Package Linux ${{ inputs.arch }} AppImage
+    runs-on: ubuntu-24.04
+    needs: check
+    steps:
+      # Complete history: the release scripts read tags.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Configure runner-private caches
+        run: |
+          echo "NODE_COMPILE_CACHE=${{ runner.temp }}/node-compile-cache" >> "$GITHUB_ENV"
+          echo "npm_config_devdir=${{ runner.temp }}/node-gyp" >> "$GITHUB_ENV"
+          echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Configure pnpm store path
+        id: pnpm-store
+        run: |
+          store_root="$HOME/.local/share/pnpm/store"
+          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
+          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
+          echo "path=$store_path" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      # electron-builder's AppImage tool requires FUSE2 at build time on Ubuntu 24.04 runners.
+      - name: Install AppImage build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
+      - name: Prepare Linux release settings
+        run: |
+          cp apps/desktop/.env.linux.example apps/desktop/.env.linux
+          sed -i 's|^DOWNLOAD_TEST_ORIGIN=.*|DOWNLOAD_TEST_ORIGIN=https://downloads.example.invalid|' apps/desktop/.env.linux
+          sed -i 's|^DOWNLOAD_TEST_RELEASE_ID=.*|DOWNLOAD_TEST_RELEASE_ID=0123456789abcdef0123456789abcdef|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
+
+      - name: Package the Linux AppImage
+        run: pnpm --dir apps/desktop run package:linux:${{ inputs.arch }}
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepseek-harness-linux-${{ inputs.arch }}
+          path: |
+            apps/desktop/.desktop-build/targets/linux-${{ inputs.arch }}/artifacts/*
+          if-no-files-found: error
+          retention-days: 14

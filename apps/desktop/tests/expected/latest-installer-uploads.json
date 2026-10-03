@@ -30,6 +30,26 @@
     "channelMetadata": false
   },
   {
+    "environment": "production",
+    "target": "linux-x64",
+    "bucket": "production-download-bucket-1250000000",
+    "publicUrl": "https://download.deepseek.com/desktop/dsh-latest-linux-x64.AppImage",
+    "filename": "dsh-latest-linux-x64.AppImage",
+    "key": "desktop/dsh-latest-linux-x64.AppImage",
+    "contentType": "application/x-executable",
+    "channelMetadata": false
+  },
+  {
+    "environment": "production",
+    "target": "linux-arm64",
+    "bucket": "production-download-bucket-1250000000",
+    "publicUrl": "https://download.deepseek.com/desktop/dsh-latest-linux-arm64.AppImage",
+    "filename": "dsh-latest-linux-arm64.AppImage",
+    "key": "desktop/dsh-latest-linux-arm64.AppImage",
+    "contentType": "application/x-executable",
+    "channelMetadata": false
+  },
+  {
     "environment": "test",
     "target": "mac-arm64",
     "bucket": "test-download-bucket-1250000000",
@@ -57,6 +77,26 @@
     "filename": "dsh-latest-windows-x64.exe",
     "key": "desktop/dsh-latest-windows-x64.exe",
     "contentType": "application/vnd.microsoft.portable-executable",
+    "channelMetadata": false
+  },
+  {
+    "environment": "test",
+    "target": "linux-x64",
+    "bucket": "test-download-bucket-1250000000",
+    "publicUrl": "https://desktop-updates.example.com/desktop/dsh-latest-linux-x64.AppImage",
+    "filename": "dsh-latest-linux-x64.AppImage",
+    "key": "desktop/dsh-latest-linux-x64.AppImage",
+    "contentType": "application/x-executable",
+    "channelMetadata": false
+  },
+  {
+    "environment": "test",
+    "target": "linux-arm64",
+    "bucket": "test-download-bucket-1250000000",
+    "publicUrl": "https://desktop-updates.example.com/desktop/dsh-latest-linux-arm64.AppImage",
+    "filename": "dsh-latest-linux-arm64.AppImage",
+    "key": "desktop/dsh-latest-linux-arm64.AppImage",
+    "contentType": "application/x-executable",
     "channelMetadata": false
   }
 ]

@@ -21,6 +21,8 @@ const TARGETS = {
   'mac-arm64': { platform: 'darwin', arch: 'arm64', os: 'mac' },
   'mac-x64': { platform: 'darwin', arch: 'x64', os: 'mac' },
   'win-x64': { platform: 'win32', arch: 'x64', os: 'win' },
+  'linux-x64': { platform: 'linux', arch: 'x64', os: 'linux' },
+  'linux-arm64': { platform: 'linux', arch: 'arm64', os: 'linux' },
 } as const satisfies Record<DesktopPackageTargetName, {
   readonly platform: NodeJS.Platform
   readonly arch: string
@@ -235,7 +237,7 @@ export async function createDesktopUploadPlan(
   }
 
   const base = `deepseek-harness-${buildVersion}-${target.os}-${target.arch}`
-  const updaterExtension = target.platform === 'darwin' ? 'zip' : 'exe'
+  const updaterExtension = target.platform === 'darwin' ? 'zip' : target.platform === 'linux' ? 'AppImage' : 'exe'
   const updaterInfo = updateFileInfo(metadata.files[0], `${metadataFilename}.files[0]`, `${base}.${updaterExtension}`)
   const updaterPath = await verifyChecksummedArtifact(artifactsRoot, updaterInfo)
   const artifacts: DesktopUploadArtifact[] = []
@@ -253,11 +255,11 @@ export async function createDesktopUploadPlan(
     )
   }
   else {
-    const blockmapPath = await requireArtifact(artifactsRoot, `${base}.exe.blockmap`)
+    const blockmapPath = await requireArtifact(artifactsRoot, `${base}.${updaterExtension}.blockmap`)
     installerArtifact = uploadArtifact(
       updaterPath,
       binaryPrefix,
-      'application/vnd.microsoft.portable-executable',
+      target.platform === 'linux' ? 'application/x-executable' : 'application/vnd.microsoft.portable-executable',
     )
     artifacts.push(installerArtifact)
     artifacts.push(uploadArtifact(blockmapPath, binaryPrefix, 'application/octet-stream'))
@@ -278,7 +280,7 @@ export async function createDesktopUploadPlan(
     const stableFilename = metadataFilename.replace('nightly', 'latest')
     artifacts.push({ ...channelArtifact, filename: stableFilename, key: `${update.keyPrefix}/${stableFilename}` })
   }
-  const latestFilename = `dsh-latest-${target.platform === 'darwin' ? 'macos' : 'windows'}-${target.arch}.${target.platform === 'darwin' ? 'dmg' : 'exe'}`
+  const latestFilename = `dsh-latest-${target.platform === 'darwin' ? 'macos' : target.platform === 'linux' ? 'linux' : 'windows'}-${target.arch}.${target.platform === 'darwin' ? 'dmg' : target.platform === 'linux' ? 'AppImage' : 'exe'}`
   const latestKey = `desktop/${latestFilename}`
   return {
     environment: update.environment,
