@@ -60,7 +60,7 @@
     "typescript": "^6.0.3",
     "vite": "^6.0.0",
     "vitest": "^4.1.8",
-    "ws": "8.21.0",
+    "ws": "8.21.3",
     "@deepseek-ai/dsh-client-ui-theme": "workspace:*",
     "@deepseek-ai/dsh-launch-environment": "workspace:*",
     "@deepseek-ai/dsh-workspace-changes": "workspace:*",
