@@ -68,12 +68,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Prepare Linux release settings
+        env:
+          SELFHOST_ORIGIN: ${{ vars.DSH_SELFHOST_ORIGIN || 'https://sswwgzs.cn' }}
         run: |
           cp apps/desktop/.env.linux.example apps/desktop/.env.linux
-          sed -i 's|^DOWNLOAD_TEST_ORIGIN=.*|DOWNLOAD_TEST_ORIGIN=https://downloads.example.invalid|' apps/desktop/.env.linux
-          sed -i 's|^DOWNLOAD_TEST_RELEASE_ID=.*|DOWNLOAD_TEST_RELEASE_ID=0123456789abcdef0123456789abcdef|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_AUTO_UPDATE_ENV=.*|DSH_DESKTOP_AUTO_UPDATE_ENV=selfhosted|' apps/desktop/.env.linux
+          sed -i 's|^# DOWNLOAD_SELFHOST_ORIGIN=.*|DOWNLOAD_SELFHOST_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
+          sed -i 's|^# DOWNLOAD_SELFHOST_PREFIX=.*|DOWNLOAD_SELFHOST_PREFIX=dsh|' apps/desktop/.env.linux
           sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
-          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
 
       # The preflight in check:package probes FUSE 2; install it here too
       # (the package job installs it, but the check job also runs the preflight).
@@ -145,15 +148,23 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libfuse2
 
       - name: Prepare Linux release settings
+        env:
+          SELFHOST_ORIGIN: ${{ vars.DSH_SELFHOST_ORIGIN || 'https://sswwgzs.cn' }}
         run: |
           cp apps/desktop/.env.linux.example apps/desktop/.env.linux
-          sed -i 's|^DOWNLOAD_TEST_ORIGIN=.*|DOWNLOAD_TEST_ORIGIN=https://downloads.example.invalid|' apps/desktop/.env.linux
-          sed -i 's|^DOWNLOAD_TEST_RELEASE_ID=.*|DOWNLOAD_TEST_RELEASE_ID=0123456789abcdef0123456789abcdef|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_AUTO_UPDATE_ENV=.*|DSH_DESKTOP_AUTO_UPDATE_ENV=selfhosted|' apps/desktop/.env.linux
+          sed -i 's|^# DOWNLOAD_SELFHOST_ORIGIN=.*|DOWNLOAD_SELFHOST_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
+          sed -i 's|^# DOWNLOAD_SELFHOST_PREFIX=.*|DOWNLOAD_SELFHOST_PREFIX=dsh|' apps/desktop/.env.linux
           sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
-          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
 
       - name: Package Linux ${{ matrix.arch }} (AppImage + deb + tar.gz)
         run: pnpm --dir apps/desktop run package:linux:${{ matrix.arch }}
+
+      # The self-hosted feed (channel manifests plus the binaries they point at) is staged beside the
+      # artifacts so it can be published either by the publish job below or from a downloaded artifact.
+      - name: Stage the self-hosted update feed
+        run: pnpm --dir apps/desktop run stage:selfhost:linux:${{ matrix.arch }}
 
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
@@ -161,5 +172,75 @@ jobs:
           name: deepseek-harness-linux-${{ matrix.arch }}
           path: |
             apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/artifacts/*
+            apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/selfhost/*
           if-no-files-found: error
           retention-days: 14
+
+  publish:
+    name: Publish Linux feeds to the self-hosted server
+    runs-on: ubuntu-24.04
+    needs: package
+    if: github.event_name != 'pull_request' && vars.DSH_SELFHOST_PUBLISH == 'true'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deepseek-harness-linux-*
+          path: apps/desktop/.desktop-build/targets
+          merge-multiple: false
+
+      # upload-artifact keeps the artifact name as a directory, so restore the build-target layout.
+      - name: Place artifacts where the publisher expects them
+        run: |
+          cd apps/desktop/.desktop-build/targets
+          for arch in x64 arm64; do
+            mkdir -p "linux-$arch"
+            mv "deepseek-harness-linux-$arch"/* "linux-$arch/"
+            rmdir "deepseek-harness-linux-$arch"
+          done
+
+      # Password-authenticated publishing runs ssh through sshpass.
+      - name: Install publishing transport
+        run: sudo apt-get update && sudo apt-get install -y rsync sshpass
+
+      - name: Prepare Linux release settings
+        env:
+          SELFHOST_ORIGIN: ${{ vars.DSH_SELFHOST_ORIGIN || 'https://sswwgzs.cn' }}
+        run: |
+          cp apps/desktop/.env.linux.example apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_AUTO_UPDATE_ENV=.*|DSH_DESKTOP_AUTO_UPDATE_ENV=selfhosted|' apps/desktop/.env.linux
+          sed -i 's|^# DOWNLOAD_SELFHOST_ORIGIN=.*|DOWNLOAD_SELFHOST_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
+          sed -i 's|^# DOWNLOAD_SELFHOST_PREFIX=.*|DOWNLOAD_SELFHOST_PREFIX=dsh|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
+
+      - name: Publish both Linux feeds
+        env:
+          DSH_SELFHOST_SSH_TARGET: ${{ secrets.DSH_SELFHOST_SSH_TARGET }}
+          DSH_SELFHOST_SSH_PORT: ${{ secrets.DSH_SELFHOST_SSH_PORT }}
+          DSH_SELFHOST_SSH_KEY: ${{ secrets.DSH_SELFHOST_SSH_KEY }}
+          DSH_SELFHOST_SSH_PASSWORD: ${{ secrets.DSH_SELFHOST_SSH_PASSWORD }}
+          DSH_SELFHOST_REMOTE_ROOT: ${{ secrets.DSH_SELFHOST_REMOTE_ROOT }}
+        run: |
+          pnpm --dir apps/desktop run upload:selfhost:linux:x64
+          pnpm --dir apps/desktop run upload:selfhost:linux:arm64

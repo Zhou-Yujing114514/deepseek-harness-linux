@@ -7,6 +7,7 @@ import { basename, join, resolve } from 'node:path'
 import { dump, load } from 'js-yaml'
 import { prerelease } from 'semver'
 import type { DesktopPackageTargetName } from './package-target.ts'
+import type { DesktopAutoUpdateEnvironment } from './desktop-auto-update-environment.mjs'
 import {
   desktopBuildRecordFilename,
   desktopUpdateMetadataFilename,
@@ -42,7 +43,7 @@ export interface DesktopUploadArtifact {
 
 /** A validated installer or update upload, with any channel metadata ordered last. */
 export interface DesktopUploadPlan {
-  readonly environment: 'test' | 'production'
+  readonly environment: DesktopAutoUpdateEnvironment
   readonly target: DesktopPackageTargetName
   readonly version: string
   /** Update feed directory URL, or the single installer URL for a fixed download. */

@@ -48,7 +48,11 @@
     "upload:latest:mac:x64": "tsx scripts/upload-target.ts mac-x64 --latest",
     "upload:latest:win:x64": "tsx scripts/upload-target.ts win-x64 --latest",
     "upload:latest:linux:x64": "tsx scripts/upload-target.ts linux-x64 --latest",
-    "upload:latest:linux:arm64": "tsx scripts/upload-target.ts linux-arm64 --latest"
+    "upload:latest:linux:arm64": "tsx scripts/upload-target.ts linux-arm64 --latest",
+    "stage:selfhost:linux:x64": "node scripts/upload-selfhosted.mjs linux-x64 --stage-only",
+    "stage:selfhost:linux:arm64": "node scripts/upload-selfhosted.mjs linux-arm64 --stage-only",
+    "upload:selfhost:linux:x64": "node scripts/upload-selfhosted.mjs linux-x64 --prune --verify",
+    "upload:selfhost:linux:arm64": "node scripts/upload-selfhosted.mjs linux-arm64 --prune --verify"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
