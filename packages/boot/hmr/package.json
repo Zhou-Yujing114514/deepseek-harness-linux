@@ -36,7 +36,7 @@
     "@deepseek-ai/dsh-cmdline": "workspace:*"
   },
   "dependencies": {
-    "@babel/code-frame": "^7.29.0",
+    "@babel/code-frame": "^8.0.0",
     "chokidar": "^4.0.3",
     "node-addon-require-builtin": "^0.1.6",
     "picomatch": "^4.0.3",
