@@ -86,6 +86,8 @@ async function fixture(
         ...info,
       }],
     })}\n`)
+    await writeFile(join(artifactsRoot, `${base}.deb`), 'Debian package fixture')
+    await writeFile(join(artifactsRoot, `${base}.tar.gz`), 'portable archive fixture')
   }
   else {
     const executable = 'signed NSIS executable fixture'
@@ -280,6 +282,35 @@ describe('desktop upload plan', () => {
       publicUrl: 'https://download.deepseek.com/dsh-desk/feeds/win-x64/',
       bucket: PRODUCTION_BUCKET,
     })
+  })
+
+  it('validates the Linux AppImage update feed and additional install formats', async () => {
+    const paths = await fixture('linux-x64')
+    const plan = await createDesktopUploadPlan('linux-x64', paths)
+    expect(plan.artifacts.map(artifact => artifact.filename)).toEqual([
+      'deepseek-harness-1.2.3-linux-x64.AppImage',
+      'deepseek-harness-1.2.3-linux-x64.AppImage.blockmap',
+      'deepseek-harness-1.2.3-linux-x64.deb',
+      'deepseek-harness-1.2.3-linux-x64.tar.gz',
+      'nightly-linux.yml',
+      'latest-linux.yml',
+    ])
+    const deb = plan.artifacts.find(artifact => artifact.filename.endsWith('.deb'))!
+    expect(deb.contentType).toBe('application/vnd.debian.binary-package')
+    expect(plan.artifacts.filter(artifact => artifact.channelMetadata)).toHaveLength(2)
+  })
+
+  it('skips missing Linux install formats but keeps the AppImage update feed', async () => {
+    const paths = await fixture('linux-arm64')
+    await rm(join(paths.artifactsRoot, 'deepseek-harness-1.2.3-linux-arm64.deb'))
+    await rm(join(paths.artifactsRoot, 'deepseek-harness-1.2.3-linux-arm64.tar.gz'))
+    const plan = await createDesktopUploadPlan('linux-arm64', paths)
+    expect(plan.artifacts.map(artifact => artifact.filename)).toEqual([
+      'deepseek-harness-1.2.3-linux-arm64.AppImage',
+      'deepseek-harness-1.2.3-linux-arm64.AppImage.blockmap',
+      'nightly-linux.yml',
+      'latest-linux.yml',
+    ])
   })
 
   it.each(['missing', 'empty'])('rejects a %s Windows blockmap before publishing its feed', async (condition) => {

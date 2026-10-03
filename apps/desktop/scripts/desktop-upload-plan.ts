@@ -254,12 +254,26 @@ export async function createDesktopUploadPlan(
       uploadArtifact(blockmapPath, binaryPrefix, 'application/octet-stream'),
     )
   }
+  else if (target.platform === 'linux') {
+    const blockmapPath = await requireArtifact(artifactsRoot, `${base}.AppImage.blockmap`)
+    installerArtifact = uploadArtifact(updaterPath, binaryPrefix, 'application/x-executable')
+    artifacts.push(installerArtifact)
+    artifacts.push(uploadArtifact(blockmapPath, binaryPrefix, 'application/octet-stream'))
+    // Additional install formats produced by the same electron-builder run. They are versioned
+    // binaries only: auto-update remains AppImage-only, and the fixed latest download stays the AppImage.
+    for (const [extension, contentType] of [['deb', 'application/vnd.debian.binary-package'], ['tar.gz', 'application/gzip']] as const) {
+      const path = join(artifactsRoot, `${base}.${extension}`)
+      if ((await stat(path).catch(() => undefined))?.isFile() === true) {
+        artifacts.push(uploadArtifact(path, binaryPrefix, contentType))
+      }
+    }
+  }
   else {
     const blockmapPath = await requireArtifact(artifactsRoot, `${base}.${updaterExtension}.blockmap`)
     installerArtifact = uploadArtifact(
       updaterPath,
       binaryPrefix,
-      target.platform === 'linux' ? 'application/x-executable' : 'application/vnd.microsoft.portable-executable',
+      'application/vnd.microsoft.portable-executable',
     )
     artifacts.push(installerArtifact)
     artifacts.push(uploadArtifact(blockmapPath, binaryPrefix, 'application/octet-stream'))

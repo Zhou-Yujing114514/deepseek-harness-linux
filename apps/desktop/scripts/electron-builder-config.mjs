@@ -234,7 +234,11 @@ export function createElectronBuilderConfig(
       icon: fileURLToPath(new URL('../resources/icon.png', import.meta.url)),
       executableName: 'deepseek-harness',
       category: 'Development',
-      target: ['AppImage'],
+      // deb packaging requires a maintainer; AppImage ignores it.
+      maintainer: 'DeepSeek Harness Linux maintainers <maintainers@deepseek-harness-linux.dev>',
+      synopsis: 'DeepSeek Harness desktop application for Linux',
+      // AppImage is the auto-update carrier; deb and tar.gz are additional install formats.
+      target: ['AppImage', 'deb', 'tar.gz'],
     },
     nsis: {
       installerSidebar: join(buildPaths.root, 'installer-ui', 'uninstaller-sidebar.bmp'),

@@ -42,16 +42,16 @@ pnpm dsh web
 
 ### Desktop on Linux
 
-The Desktop application can be packaged for Linux on an Ubuntu 24.04 (or compatible) host:
+The Desktop application can be packaged for Linux on an Ubuntu 24.04 (or compatible) host, for both architectures and three install formats each (AppImage, Debian `.deb`, portable `.tar.gz`):
 
 ```sh
 pnpm install
 cp apps/desktop/.env.linux.example apps/desktop/.env.linux   # then fill in the release settings
-pnpm --dir apps/desktop run package:linux:x64                # AppImage for x64
-pnpm --dir apps/desktop run package:linux:arm64              # AppImage for arm64
+pnpm --dir apps/desktop run package:linux:x64                # x64 (AMD/Intel): AppImage + deb + tar.gz
+pnpm --dir apps/desktop run package:linux:arm64              # ARM64: AppImage + deb + tar.gz
 ```
 
-Electron-builder needs FUSE 2 (`libfuse2`) on the build host to assemble an AppImage. The Linux build is unsigned and updates go through the same `electron-updater` AppImage channel. See [the Desktop packaging notes](apps/desktop/README.md) for release versions, uploads, and per-target environment files.
+Electron-builder needs FUSE 2 (`libfuse2`) on the build host to assemble an AppImage; `.deb` packaging requires a maintainer, which the Linux configuration already sets. Linux builds are unsigned; auto-update goes through the AppImage channel (electron-updater), while `.deb` and `.tar.gz` are versioned installers published alongside it. The `Desktop (Linux)` workflow builds both architectures on demand. See [the Desktop packaging notes](apps/desktop/README.md) for release versions, uploads, and per-target environment files.
 
 ## Community and support
 

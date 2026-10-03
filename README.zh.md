@@ -46,16 +46,16 @@ pnpm dsh web
 
 ### Linux 桌面端
 
-桌面应用可在 Ubuntu 24.04（或兼容发行版）上打包为 Linux 版本：
+桌面应用可在 Ubuntu 24.04（或兼容发行版）上打包，支持两种架构（x64/ARM64），每种架构产出三种安装格式（AppImage、Debian `.deb`、便携 `.tar.gz`）：
 
 ```sh
 pnpm install
 cp apps/desktop/.env.linux.example apps/desktop/.env.linux   # 然后填入发布配置
-pnpm --dir apps/desktop run package:linux:x64                # 生成 x64 AppImage
-pnpm --dir apps/desktop run package:linux:arm64              # 生成 arm64 AppImage
+pnpm --dir apps/desktop run package:linux:x64                # x64（AMD/Intel）：AppImage + deb + tar.gz
+pnpm --dir apps/desktop run package:linux:arm64              # ARM64：AppImage + deb + tar.gz
 ```
 
-打包 AppImage 时构建机需要 FUSE 2（`libfuse2`）。Linux 构建不做代码签名，更新走 `electron-updater` 的 AppImage 渠道。发布版本号、上传与各平台环境变量文件详见[桌面端打包说明](apps/desktop/README.md)。
+打包 AppImage 时构建机需要 FUSE 2（`libfuse2`）；`.deb` 打包需要 maintainer 字段（Linux 配置中已内置）。Linux 构建不做代码签名，自动更新走 `electron-updater` 的 AppImage 渠道，`.deb` 与 `.tar.gz` 作为同版本安装包一并发布。仓库内置 `Desktop (Linux)` 工作流可一键同时构建两个架构。发布版本号、上传与各平台环境变量文件详见[桌面端打包说明](apps/desktop/README.md)。
 
 ## 社区与支持
 
