@@ -16,6 +16,7 @@ import { withWindowsSigningStage } from './windows-signing-stage.mjs'
 import { prepareWindowsSignatureCacheDirectory, resolveWindowsSignatureCacheDirectory } from './windows-signature-cache-directory.mjs'
 import { withMacOSSigningKeychain } from './macos-signing-keychain.mjs'
 import { macOSDownloadEnvironment, resolveMacOSPackageSettings } from './macos-package-settings.mjs'
+import { resolveLinuxPackageSettings } from './linux-package-settings.mjs'
 import { packagingErrorDetails, packagingStep } from './packaging-step.mjs'
 import { notarizeMacOS } from './notarize-macos.mjs'
 import { resolveMacOSNotarizationEnvironment } from './desktop-release-environment.mjs'
@@ -208,6 +209,9 @@ export function resolveDesktopPackageTarget(
   if (name === 'linux-x64' && hostArch !== 'x64') {
     throw new Error('desktop package: linux-x64 requires an x64 Linux build host')
   }
+  // Cross-building linux-arm64 on an x64 host is permitted for convenience, but architecture-dependent
+  // native modules (node-pty, LibreOffice Kit) are only exercised by the packaged runtime smoke test on
+  // the target architecture; prefer a native arm64 host or the ubuntu-24.04-arm CI runner.
   return target
 }
 
@@ -389,6 +393,8 @@ async function main(): Promise<void> {
       await packagingStep(run.directory, 'macos-package', () => withMacOSSigningKeychain(environment,
         signingEnvironment => packageTarget(invocation, signingEnvironment, run)), secrets)
     } else if (target.platform === 'linux') {
+      const settings = resolveLinuxPackageSettings(environment)
+      recordPackagingEvent(run.directory, { type: 'linux-settings', packConcurrency: settings.packConcurrency })
       await packagingStep(run.directory, 'linux-package', () => packageTarget(invocation, environment, run), secrets)
     } else {
       await packagingStep(run.directory, 'windows-package', () => packageTarget(invocation, environment, run), secrets)
@@ -422,7 +428,9 @@ export async function packageTarget(
   const journal = target.platform === 'darwin' ? process.env.DSH_DESKTOP_PACKAGING_RUN_DIR : undefined
   const proxyEvent = (status: string) => { if (journal) recordPackagingEvent(journal, { type: 'notarization-proxy', status }) }
   const mac = target.platform === 'darwin' ? resolveMacOSPackageSettings(environment) : undefined
-  const packArguments = mac === undefined ? [] : ['--concurrency', String(mac.packConcurrency)]
+  const linux = target.platform === 'linux' ? resolveLinuxPackageSettings(environment) : undefined
+  const packConcurrency = mac?.packConcurrency ?? linux?.packConcurrency
+  const packArguments = packConcurrency === undefined ? [] : ['--concurrency', String(packConcurrency)]
   const buildPaths = desktopTargetBuildPaths(target.name)
   const releaseRecordPath = join(buildPaths.artifacts, desktopBuildRecordFilename(target.name))
   if (!invocation.prepareOnly && !invocation.unsigned) {

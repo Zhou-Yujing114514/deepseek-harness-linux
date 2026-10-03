@@ -51,7 +51,7 @@ pnpm --dir apps/desktop run package:linux:x64                # x64 (AMD/Intel): 
 pnpm --dir apps/desktop run package:linux:arm64              # ARM64: AppImage + deb + tar.gz
 ```
 
-Electron-builder needs FUSE 2 (`libfuse2`) on the build host to assemble an AppImage; `.deb` packaging requires a maintainer, which the Linux configuration already sets. Linux builds are unsigned; auto-update goes through the AppImage channel (electron-updater), while `.deb` and `.tar.gz` are versioned installers published alongside it. The `Desktop (Linux)` workflow builds both architectures on demand. See [the Desktop packaging notes](apps/desktop/README.md) for release versions, uploads, and per-target environment files.
+Electron-builder needs FUSE 2 (`libfuse2`) on the build host to assemble an AppImage; `.deb` packaging requires a maintainer, which the Linux configuration already sets. Linux builds are unsigned: auto-update goes through the AppImage channel (electron-updater) with HTTPS and the `nightly-linux.yml` feed but no code-signature verification, so for distribution to third parties this is the supply-chain point to assess. `.deb` and `.tar.gz` are versioned installers published alongside it. The `Desktop (Linux)` workflow builds both architectures on native runners on demand. See [the Desktop packaging notes](apps/desktop/README.md) for release versions, uploads, and per-target environment files.
 
 ## Community and support
 

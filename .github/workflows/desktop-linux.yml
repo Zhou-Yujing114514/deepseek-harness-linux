@@ -70,12 +70,17 @@ jobs:
 
   package:
     name: Package Linux ${{ matrix.arch }} (AppImage + deb + tar.gz)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runs-on }}
     needs: check
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, arm64]
+        include:
+          # Native runners: cross-building arm64 on x64 hosts risks silently unusable native modules.
+          - arch: x64
+            runs-on: ubuntu-24.04
+          - arch: arm64
+            runs-on: ubuntu-24.04-arm
     steps:
       # Complete history: the release scripts read tags.
       - uses: actions/checkout@v6

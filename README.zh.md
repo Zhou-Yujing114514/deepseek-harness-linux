@@ -55,7 +55,7 @@ pnpm --dir apps/desktop run package:linux:x64                # x64（AMD/Intel�
 pnpm --dir apps/desktop run package:linux:arm64              # ARM64：AppImage + deb + tar.gz
 ```
 
-打包 AppImage 时构建机需要 FUSE 2（`libfuse2`）；`.deb` 打包需要 maintainer 字段（Linux 配置中已内置）。Linux 构建不做代码签名，自动更新走 `electron-updater` 的 AppImage 渠道，`.deb` 与 `.tar.gz` 作为同版本安装包一并发布。仓库内置 `Desktop (Linux)` 工作流可一键同时构建两个架构。发布版本号、上传与各平台环境变量文件详见[桌面端打包说明](apps/desktop/README.md)。
+打包 AppImage 时构建机需要 FUSE 2（`libfuse2`）；`.deb` 打包需要 maintainer 字段（Linux 配置中已内置）。Linux 构建不做代码签名：自动更新走 `electron-updater` 的 AppImage 渠道，链路依赖 HTTPS 与 `nightly-linux.yml` 元数据、无签名校验，若要向第三方分发，这是需要评估的供应链环节。`.deb` 与 `.tar.gz` 作为同版本安装包一并发布。仓库内置 `Desktop (Linux)` 工作流可在原生双架构 runner 上一键构建。发布版本号、上传与各平台环境变量文件详见[桌面端打包说明](apps/desktop/README.md)。
 
 ## 社区与支持
 

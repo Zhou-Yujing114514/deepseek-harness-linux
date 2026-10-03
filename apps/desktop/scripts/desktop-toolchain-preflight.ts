@@ -9,7 +9,7 @@
  */
 
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
@@ -68,6 +68,36 @@ async function probeWindowsInstallerToolchain(environment: NodeJS.ProcessEnv): P
   return failures
 }
 
+async function probeLinuxAppImageToolchain(): Promise<DesktopToolchainProbeFailure[]> {
+  // electron-builder's AppImage tool mounts the payload squashfs with FUSE 2 at build time; the
+  // failure otherwise surfaces only after the whole runtime has been downloaded and prepared.
+  const detail = 'the FUSE 2 user-space library is required to assemble an AppImage; install libfuse2 (Debian/Ubuntu: sudo apt-get install libfuse2)'
+  try {
+    const { stdout } = await run('ldconfig', ['-p'], { windowsHide: true, timeout: 20_000 })
+    if (/\blibfuse\.so\.2\b/u.test(stdout)) return []
+  }
+  catch {
+    // ldconfig may be absent on non-glibc distributions; fall through to a library-path scan.
+  }
+  const candidates = [
+    '/usr/lib/x86_64-linux-gnu',
+    '/usr/lib/aarch64-linux-gnu',
+    '/usr/lib',
+    '/lib/x86_64-linux-gnu',
+    '/lib/aarch64-linux-gnu',
+    '/lib',
+  ]
+  for (const directory of candidates) {
+    try {
+      if ((await readdir(directory)).includes('libfuse.so.2')) return []
+    }
+    catch {
+      // Directory missing; keep scanning.
+    }
+  }
+  return [{ tool: 'libfuse2', detail }]
+}
+
 /**
  * Probe every external tool one packaging run needs.
  * @param platform - Target platform; a Windows target already requires a Windows build host.
@@ -82,6 +112,7 @@ export async function probeDesktopToolchain(
   const tar = await probeTar()
   if (tar !== undefined) failures.push({ tool: 'tar', detail: tar })
   if (platform === 'win32') failures.push(...await probeWindowsInstallerToolchain(environment))
+  if (platform === 'linux') failures.push(...await probeLinuxAppImageToolchain())
   return failures
 }
 
