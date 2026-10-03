@@ -10,6 +10,15 @@
 name: Desktop (Linux)
 
 on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-linux.yml'
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-linux.yml'
   workflow_dispatch:
 
 permissions:
@@ -72,6 +81,9 @@ jobs:
     name: Package Linux ${{ matrix.arch }} (AppImage + deb + tar.gz)
     runs-on: ${{ matrix.runs-on }}
     needs: check
+    # Pull requests validate configuration only; full packaging runs on pushes
+    # (and manual dispatch) where the artifacts are actually wanted.
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
