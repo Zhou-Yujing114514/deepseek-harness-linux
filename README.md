@@ -1,90 +1,97 @@
-# DeepSeek Harness
+# DeepSeek Harness · Linux 桌面版
 
-English | [中文](README.zh.md)
+> 给官方 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 桌面端补上**一等公民级的 Linux 打包** —— 开箱即用的 AppImage / `.deb` / `.tar.gz`，覆盖 x64 与 arm64 双架构，配套原生 CI 与 AppImage 自动更新。
 
-DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek AI](https://deepseek.com).
+官方桌面端只发布 macOS 与 Windows；Linux 用户要么退而用 Web 版，要么自己从源码硬编。本项目就是这个缺口的补完：在保留官方桌面全部功能的前提下，把 Linux 当成**正式支持平台**来打包、测试、分发。
 
-It is built on an **everything-is-a-plugin** architecture and powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512).
+## 这是什么 / 不是什么
 
-Documentation: [https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
+- ✅ **是**：一个下游 fork，专注做一件事——让 dsh 桌面端在 Linux 上「能下载、能装、能更新」。
+- ❌ **不是**：不是官方 DeepSeek 项目，也不魔改 agent 内核。agent 能力、插件体系、通信协议全部跟随上游。
 
-## Developer preview
+## 产物一览
 
-DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
+每次构建为每种架构产出三种安装包：
 
-Review the [safety notice](SAFETY.md) before running the project.
+| 格式 | 用途 | 典型文件名 |
+|------|------|-----------|
+| **AppImage** | 单文件免安装，支持自动更新 | `deepseek-harness-0.2.0-rc.2-linux-x64.AppImage` |
+| **.deb** | Debian / Ubuntu 系原生包管理 | `deepseek-harness-0.2.0-rc.2-linux-x64.deb` |
+| **.tar.gz** | 便携解压即用 | `deepseek-harness-0.2.0-rc.2-linux-x64.tar.gz` |
 
-## Run
+支持架构：`x64`（AMD / Intel）、`arm64`（树莓派 5、Apple Silicon 上的 Linux、ARM 服务器等）。
 
-### Run from `npm`
+## 快速开始
 
-Install `Node.js`, then run:
+### 方式一：AppImage（推荐，支持自动更新）
+
+1. 到 [Releases](../../releases) 下载对应架构的 `.AppImage`。
+2. 安装运行时依赖（AppImage 需要 FUSE 2）：
+   ```sh
+   sudo apt install libfuse2          # Debian / Ubuntu
+   # Fedora / RHEL 系: sudo dnf install fuse2
+   ```
+3. 赋予执行权限并运行：
+   ```sh
+   chmod +x deepseek-harness-*-linux-x64.AppImage
+   ./deepseek-harness-*-linux-x64.AppImage
+   ```
+
+### 方式二：.deb
 
 ```sh
-npx @deepseek-ai/dsh web
+sudo dpkg -i deepseek-harness-*-linux-x64.deb
+deepseek-harness            # 或直接从应用菜单启动
 ```
 
-The command starts the Web UI at `http://127.0.0.1:3080` by default and opens it in the default browser for a local launch. An SSH launch only prints the host URL because the SSH client or editor owns the local forwarded address. Pass `--no-open` to run the server without opening a browser. See [Web UI guide](docs/user/guide/index.md).
-
-### Run from source
-
-To run from a repository checkout:
+### 方式三：.tar.gz（便携）
 
 ```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
+tar -xzf deepseek-harness-*-linux-x64.tar.gz
+cd deepseek-harness-*-linux-x64
+./deepseek-harness          # 运行解压目录内的启动入口
+```
+
+> 在无显示环境（如远程服务器 + VNC）运行时，确保已设置 `DISPLAY`（例如 xfce4 + TigerVNC 下的 `:1`），桌面会自动拉起。
+
+## 从源码构建（开发者）
+
+需要 Node.js 24+、pnpm，以及构建主机上的 `libfuse2`（AppImage 组装所需）。
+
+```sh
+git clone https://github.com/Zhou-Yujing114514/deepseek-harness-linux.git
+cd deepseek-harness-linux
 pnpm install
-pnpm run build
-pnpm dsh web
+cp apps/desktop/.env.linux.example apps/desktop/.env.linux   # 按需填写发布设置
+pnpm --dir apps/desktop run package:linux:x64                # x64
+pnpm --dir apps/desktop run package:linux:arm64              # arm64
 ```
 
-`pnpm run build` prepares the repository artifacts. `pnpm dsh web` uses those built artifacts without rebuilding.
+`Desktop (Linux)` 工作流会在原生 runner 上按需构建两种架构（`ubuntu-24.04` / `ubuntu-24.04-arm`），产物可在 Actions Artifacts 或自动发布的 Release 中获取。
 
-### Desktop on Linux
+## 自动更新
 
-The Desktop application can be packaged for Linux on an Ubuntu 24.04 (or compatible) host, for both architectures and three install formats each (AppImage, Debian `.deb`, portable `.tar.gz`):
+AppImage 通过 `electron-updater` 走 AppImage 更新通道，更新描述符为 `nightly-linux.yml`，全程 HTTPS。未签名构建下，更新**仅依赖 HTTPS 传输与 feed 元数据校验**，无代码签名验签——请勿用于高信任场景，下载时务必核对 Release 附带的 SHA256。
 
-```sh
-pnpm install
-cp apps/desktop/.env.linux.example apps/desktop/.env.linux   # then fill in the release settings
-pnpm --dir apps/desktop run package:linux:x64                # x64 (AMD/Intel): AppImage + deb + tar.gz
-pnpm --dir apps/desktop run package:linux:arm64              # ARM64: AppImage + deb + tar.gz
-```
+## 已知限制
 
-Electron-builder needs FUSE 2 (`libfuse2`) on the build host to assemble an AppImage; `.deb` packaging requires a maintainer, which the Linux configuration already sets. Linux builds are unsigned: auto-update goes through the AppImage channel (electron-updater) with HTTPS and the `nightly-linux.yml` feed but no code-signature verification, so for distribution to third parties this is the supply-chain point to assess. `.deb` and `.tar.gz` are versioned installers published alongside it. The `Desktop (Linux)` workflow builds both architectures on native runners on demand. See [the Desktop packaging notes](apps/desktop/README.md) for release versions, uploads, and per-target environment files.
+1. **未签名**：Linux 构建不带代码签名。这是社区构建，分发时请在 Release 中核对校验和。
+2. **Office 文档转换暂缺**：桌面内嵌的 DOCX / XLSX / PPTX → PDF 转换依赖 LibreOffice Kit 的 Linux 原生绑定，本版本尚未将其随包分发，该功能在 Linux 下暂不可用。其余桌面功能（agent、skill、联网、前端）均正常。
+3. **上游处于 developer preview**：官方迭代快、破坏性变更频繁，本项目会持续 rebase 上游提交。
+4. **无公证 / 无商店上架**：不走任何系统级公证或应用商店流程。
 
-## Community and support
+## 与上游的关系
 
-- Submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
-- Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
-- Join <a href="https://discord.gg/4MrtZUhpxg">DeepSeek Harness Discord community</a>.
+- 上游：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（MIT，DeepSeek-AI）。
+- 本仓库是其下游 fork：**agent 内核与官方保持同步**，新增内容仅限于 Linux 打包层——CI 工作流、electron-builder 配置、类型声明补全、POSIX launcher 兼容、桌面端打包说明与单元测试用例。
+- 计划将 Linux 打包支持以 PR / Discussion 形式回喂上游，让官方原生支持 Linux 桌面。
 
-## Contributing
+## 安全须知
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+- 运行前请阅读上游 [SAFETY.md](https://github.com/deepseek-ai/deepseek-harness/blob/master/SAFETY.md)。
+- 未签名二进制存在供应链风险：只从本仓库 Release 下载，并核对 SHA256 校验和。
+- 自动更新通道未做代码签名验签，仅依赖 HTTPS + feed 元数据。
 
-## Development
+## 许可证
 
-Start with the [development guide](docs/development.md) and [architecture documentation](docs/architecture.md).
-
-`pnpm run dev:web` builds, serves, and rebuilds client bundles on source edits in one terminal, and `make help` lists the matching Make targets for Web and Desktop; the guide's application commands section owns the full table.
-
-For agents, follow [AGENTS.md](AGENTS.md).
-
-## Citation
-
-```bibtex
-@misc{deepseek-harness2026,
-  title={DeepSeek Harness: Everything is a Plugin},
-  author={DeepSeek-AI},
-  year={2026},
-  publisher={GitHub},
-  howpublished={\url{https://github.com/deepseek-ai/deepseek-harness}},
-}
-```
-
-## License
-
-[MIT](LICENSE)
-
-Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+本项目基于上游 **MIT** 许可证分发。DeepSeek Harness 由 DeepSeek-AI 开发，版权归其所有；Linux 打包层在同一 MIT 许可下新增。详见 [LICENSE](LICENSE) 与 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
