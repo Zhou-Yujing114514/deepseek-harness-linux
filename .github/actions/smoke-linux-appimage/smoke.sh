@@ -31,6 +31,12 @@ if [[ ${#images[@]} -ne 1 ]]; then
   exit 1
 fi
 image="${images[0]}"
+# Resolve to an absolute path before anything changes directories. The extract step does
+# `cd "$work" && "$image" --appimage-extract`; a relative path would not resolve from there
+# and the extraction would fail with "No such file or directory", producing no squashfs-root
+# and no AppRun. This was the gate's real failure mode (masked while extract errors were
+# swallowed), independent of whether unsquashfs is installed.
+image="$(cd "$(dirname "$image")" && pwd)/$(basename "$image")"
 echo "== target =="
 echo "    $image ($(stat -c %s "$image") bytes)"
 
