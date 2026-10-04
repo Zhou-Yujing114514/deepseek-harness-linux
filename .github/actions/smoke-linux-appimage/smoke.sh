@@ -49,10 +49,20 @@ trap cleanup EXIT
 echo "== unpacking =="
 # Mounting an AppImage needs FUSE, which a CI container does not offer; the runtime can unpack
 # itself either way, so take the path that needs no kernel module.
-( cd "$work" && "$image" --appimage-extract > /dev/null 2>&1 )
+# --appimage-extract unpacks the squashfs payload; it shells out to unsquashfs, so
+# squashfs-tools must be installed on the runner (see the action's apt step). Surface its
+# output instead of swallowing it, so a missing tool or a corrupt payload is diagnosable.
+( cd "$work" && "$image" --appimage-extract ) > "$work/extract.log" 2>&1
 appdir="$work/squashfs-root"
+if [[ ! -d "$appdir" ]]; then
+  echo "FAIL: extraction produced no squashfs-root (unsquashfs missing or payload corrupt)" >&2
+  sed -n '1,40p' "$work/extract.log" >&2
+  exit 1
+fi
 if [[ ! -x "$appdir/AppRun" ]]; then
   echo "FAIL: no executable AppRun under $appdir" >&2
+  echo "    squashfs-root contents:" >&2
+  ls -la "$appdir" >&2
   exit 1
 fi
 
