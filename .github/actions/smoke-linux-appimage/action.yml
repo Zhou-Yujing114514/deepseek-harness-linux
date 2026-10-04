@@ -30,7 +30,13 @@ runs:
         # itself needs before it can reach the point of drawing a window.
         sudo apt-get install -y --no-install-recommends \
           xvfb x11-utils xdotool imagemagick \
-          libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libasound2 libgbm1 libdrm2 xauth
+          libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libgbm1 libdrm2 xauth
+        # libasound was renamed libasound2t64 on Ubuntu 24.04 / Debian 13 (the 64-bit time_t
+        # transition); installing the old name fails the step on those runners. Audio is not
+        # needed to confirm the window opens, so the gate tolerates either name being absent.
+        sudo apt-get install -y --no-install-recommends libasound2t64 2>/dev/null \
+          || sudo apt-get install -y --no-install-recommends libasound2 2>/dev/null \
+          || true
 
     - name: Launch the packaged application
       shell: bash
