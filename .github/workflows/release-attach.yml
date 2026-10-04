@@ -1,0 +1,87 @@
+# A manual recovery path for the release step of desktop-linux.yml.
+#
+# Publishing to the self-hosted feed takes hours and is the channel that actually matters:
+# the client's app-update.yml points at https://sswwgzs.cn/dsh/, never at GitHub. When the
+# trailing release job fails for a reason that has nothing to do with the packages - a bad
+# glob, an expired token, a transient API error - rerunning the whole workflow would rebuild
+# and re-upload two gigabytes for nothing. This workflow skips straight to the part that
+# failed: pull the artifacts off the finished run and hang them on a release.
+name: Attach Linux packages to a GitHub release (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 来源运行 ID（从该运行的 artifacts 取包）
+        required: true
+      version:
+        description: 版本号，例如 0.2.0-rc.3
+        required: true
+      prerelease:
+        description: 标记为预发布
+        type: boolean
+        default: true
+
+jobs:
+  attach:
+    name: Attach the Linux packages to a GitHub release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Download the packaged artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          gh run download "${{ inputs.run_id }}" -n deepseek-harness-linux-x64   -D raw/x64
+          gh run download "${{ inputs.run_id }}" -n deepseek-harness-linux-arm64 -D raw/arm64
+          du -sh raw/*
+
+      # upload-artifact preserves whatever directory prefix the upload globs left behind, so
+      # the packages may sit at the root of the download or one `artifacts/` level down.
+      # Searching instead of assuming a depth keeps this working either way.
+      - name: Collect the release assets
+        run: |
+          set -euo pipefail
+          assets="$GITHUB_WORKSPACE/release-assets"
+          mkdir -p "$assets"
+          for arch in x64 arm64; do
+            for pattern in '*.AppImage' '*.deb' '*.tar.gz'; do
+              find "raw/$arch" -name "$pattern" -exec cp -a {} "$assets/" \;
+            done
+          done
+          ( cd "$assets" && sha256sum -- * > SHA256SUMS.txt )
+          ls -l "$assets"
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}（Linux）
+          prerelease: ${{ inputs.prerelease }}
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          files: release-assets/*
+          body: |
+            DeepSeek Harness 桌面版 Linux 安装包，x64 与 arm64 各三种格式。
+
+            **自动更新**：客户端内置的更新源为 `https://sswwgzs.cn/dsh/`，安装后会自动从该地址检查更新，与本页面无关。本 Release 只是额外的分发与备份渠道。
+
+            **安装方式**
+            - AppImage：`chmod +x *.AppImage && ./<文件名>`
+            - deb：`sudo apt install ./<文件名>`
+            - tar.gz：解压后运行其中的 `deepseek-harness`
+
+            **架构选择**：x64 用于常规 PC / 服务器；arm64 用于飞腾、鲲鹏、ARM 虚拟机等机型。
+
+            附 `SHA256SUMS.txt` 用于校验镜像完整性。
