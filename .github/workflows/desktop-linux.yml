@@ -193,6 +193,9 @@ jobs:
     runs-on: ubuntu-24.04
     needs: package
     if: github.event_name != 'pull_request' && vars.DSH_SELFHOST_PUBLISH == 'true'
+    # A gigabyte-scale push to a distant server is slow; a hard ceiling keeps a stalled
+    # transfer from silently occupying the runner until the six-hour job limit.
+    timeout-minutes: 300
     permissions:
       contents: read
     steps:

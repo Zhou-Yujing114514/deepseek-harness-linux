@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { cp, link, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { parseArgs } from 'node:util'
@@ -26,6 +26,16 @@ const TARGETS = {
   'linux-x64': { arch: 'x64' },
   'linux-arm64': { arch: 'arm64' },
 }
+/**
+ * Concurrent scp streams, and how large a single artifact has to grow before it is split.
+ * A lone scp stream crosses a high-latency link at a few tens of kB/s: ssh's channel window
+ * never grows large enough to fill the pipe, so the transfer is latency-bound rather than
+ * bandwidth-bound. Several streams each carry their own window, which is what keeps a
+ * gigabyte-scale publish inside the job budget instead of running for hours.
+ */
+const PARALLEL_STREAMS = 10
+const CHUNK_BYTES = 12 * 1024 * 1024
+const CHUNK_THRESHOLD = 24 * 1024 * 1024
 /**
  * electron-builder spells the architecture differently per target: AppImage uses x86_64,
  * deb uses amd64, and tar.gz keeps x64. Map every spelling back to the Node.js architecture.
@@ -155,23 +165,99 @@ async function stageFile(source, destination) {
   await link(source, destination).catch(() => cp(source, destination))
 }
 
-/** Push one staged directory to the remote document root. */
-async function upload(localDirectory, remoteRoot) {
+/**
+ * Send every file in the queue, several at a time, each through its own scp process.
+ * @param {{ local: string, remote: string }[]} transfers Files still to send.
+ * @returns {Promise<void>} Resolves once either all files arrived or at least one gave up.
+ */
+async function transferAll(transfers) {
   const target = requiredAmbient('DSH_SELFHOST_SSH_TARGET')
   const password = sshPassword()
-  await remote(`mkdir -p ${JSON.stringify(remoteRoot)}`)
-  const rsyncAvailable = await run('rsync', ['--version'], { maxBuffer: 1 << 20 }).then(() => true, () => false)
-  // rsync needs a shell string for ssh; keep that path for key authentication only.
-  if (rsyncAvailable && password === undefined) {
-    await withRetry('rsync', () => run('rsync', ['-az', '--itemize-changes', '-e', ['ssh', ...sshOptions('ssh')].join(' '),
-      `${localDirectory}/`, `${target}:${remoteRoot}/`], { maxBuffer: 1 << 24 }))
-    return 'rsync'
+  const queue = transfers.slice()
+  const failures = []
+  const worker = async () => {
+    for (;;) {
+      const item = queue.shift()
+      if (item === undefined) return
+      const argv = [...sshOptions('scp'), item.local, `${target}:${item.remote}`]
+      const argv0 = password === undefined ? 'scp' : 'sshpass'
+      const args = password === undefined ? argv : ['-p', password, 'scp', ...argv]
+      try {
+        await withRetry(`scp ${basename(item.remote)}`, () => run(argv0, args, { maxBuffer: 1 << 24 }))
+      } catch (error) {
+        failures.push(`${basename(item.remote)}: ${error.message}`)
+      }
+    }
   }
-  const argv = ['-r', ...sshOptions('scp'), `${localDirectory}/.`, `${target}:${remoteRoot}/`]
-  const argv0 = password === undefined ? 'scp' : 'sshpass'
-  const args = password === undefined ? argv : ['-p', password, 'scp', ...argv]
-  await withRetry('scp', () => run(argv0, args, { maxBuffer: 1 << 24 }))
-  return 'scp'
+  const streams = Math.min(PARALLEL_STREAMS, Math.max(transfers.length, 1))
+  await Promise.all(Array.from({ length: streams }, worker))
+  if (failures.length > 0) {
+    throw new Error(`desktop self-hosted upload: ${failures.length} transfer(s) failed: ${failures.join('; ')}`)
+  }
+}
+
+/** Push one staged directory to the remote document root, splitting large artifacts across streams. */
+async function upload(localDirectory, remoteRoot) {
+  await remote(`mkdir -p ${JSON.stringify(remoteRoot)}`)
+  // Chunks land beside the document root, never inside it: a partially reassembled
+  // AppImage must not be visible to a client that polls mid-publish.
+  const chunkRoot = `${remoteRoot}-upload`
+  await remote(`rm -rf ${JSON.stringify(chunkRoot)} && mkdir -p ${JSON.stringify(chunkRoot)}`)
+
+  const entries = (await readdir(localDirectory, { withFileTypes: true })).filter(entry => entry.isFile())
+  const localChunkRoot = join(dirname(localDirectory), '.upload-chunks')
+  await rm(localChunkRoot, { recursive: true, force: true })
+
+  // A publish that runs out of job time is retried by re-running the workflow, so skip
+  // artifacts that already arrived whole. Manifests are always resent: they are tiny, and
+  // they are what flips the feed over to the version just uploaded.
+  const present = new Map()
+  for (const line of (await remote(`ls -l ${JSON.stringify(remoteRoot)}`)).stdout.split('\n')) {
+    const columns = line.trim().split(/\s+/u)
+    if (columns.length < 9) continue
+    present.set(columns.at(-1), Number(columns[4]))
+  }
+
+  const transfers = []
+  const assemblies = []
+  for (const [index, entry] of entries.entries()) {
+    const name = entry.name
+    const local = join(localDirectory, name)
+    const size = (await stat(local)).size
+    if (!name.endsWith('.yml') && present.get(name) === size) {
+      process.stdout.write(`desktop self-hosted upload: ${name} already published, skipping\n`)
+      continue
+    }
+    if (size <= CHUNK_THRESHOLD) {
+      transfers.push({ local, remote: `${remoteRoot}/${name}` })
+      continue
+    }
+    await mkdir(localChunkRoot, { recursive: true })
+    const prefix = `part-${index}-`
+    await run('split', ['-b', String(CHUNK_BYTES), '-d', '-a', '3', local, join(localChunkRoot, prefix)], { maxBuffer: 1 << 24 })
+    const pieces = (await readdir(localChunkRoot)).filter(candidate => candidate.startsWith(prefix)).sort()
+    if (pieces.length === 0) throw new Error(`desktop self-hosted upload: split produced no pieces for ${name}`)
+    const remotePieces = pieces.map(piece => `${chunkRoot}/${piece}`)
+    pieces.forEach((piece, position) => {
+      transfers.push({ local: join(localChunkRoot, piece), remote: remotePieces[position] })
+    })
+    assemblies.push({ name, size, remoteFile: `${remoteRoot}/${name}`, remotePieces })
+  }
+
+  await transferAll(transfers)
+  await rm(localChunkRoot, { recursive: true, force: true })
+
+  for (const item of assemblies) {
+    const quoted = item.remotePieces.map(piece => JSON.stringify(piece)).join(' ')
+    await remote(`cat ${quoted} > ${JSON.stringify(item.remoteFile)} && rm -f ${quoted}`)
+    const listing = await remote(`stat -c %s ${JSON.stringify(item.remoteFile)}`)
+    const arrived = Number(listing.stdout.trim())
+    if (arrived !== item.size) {
+      throw new Error(`desktop self-hosted upload: ${item.name} reassembled to ${arrived} bytes, expected ${item.size}`)
+    }
+  }
+  await remote(`rm -rf ${JSON.stringify(chunkRoot)}`)
+  return `scp (${PARALLEL_STREAMS} streams)`
 }
 
 /** Delete superseded artifacts of the same architecture so the server keeps current versions. */
