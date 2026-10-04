@@ -276,3 +276,86 @@ jobs:
         run: |
           pnpm --dir apps/desktop run upload:selfhost:linux:x64
           pnpm --dir apps/desktop run upload:selfhost:linux:arm64
+
+  # A second distribution channel, not a second update channel. The client's baked-in
+  # app-update.yml points at the self-hosted origin, so a GitHub release never competes with
+  # it - it only gives the packages a home that survives the server. Running after publish
+  # keeps the two in step: if the feed did not go out, neither does the release.
+  release:
+    name: Attach the Linux packages to a GitHub release
+    runs-on: ubuntu-24.04
+    needs: publish
+    if: github.event_name != 'pull_request' && vars.DSH_SELFHOST_PUBLISH == 'true'
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deepseek-harness-linux-*
+          path: apps/desktop/.desktop-build/targets
+          merge-multiple: false
+
+      # Same flattening the publish step performs: upload-artifact drops the directory prefix
+      # whenever only one of the two upload globs matched.
+      - name: Read the packaged version and collect the release assets
+        id: version
+        run: |
+          set -euo pipefail
+          cd apps/desktop/.desktop-build/targets
+          for arch in x64 arm64; do
+            source="deepseek-harness-linux-$arch"
+            if [ ! -d "$source" ]; then
+              echo "::error::missing downloaded artifact $source"
+              exit 1
+            fi
+            mkdir -p "linux-$arch/artifacts"
+            cp -a "$source/." "linux-$arch/artifacts/"
+            nested="linux-$arch/artifacts/artifacts"
+            if [ -d "$nested" ]; then
+              cp -a "$nested/." "linux-$arch/artifacts/"
+              rm -rf "$nested"
+            fi
+            rm -rf "$source"
+          done
+          version=$(python3 -c "import glob, json; print(json.load(open(sorted(glob.glob('linux-x64/artifacts/*release.json'))[0]))['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          mkdir -p release-assets
+          for arch in x64 arm64; do
+            for pattern in '*.AppImage' '*.deb' '*.tar.gz'; do
+              find "linux-$arch/artifacts" -maxdepth 1 -name "$pattern" -exec cp -a {} release-assets/ \;
+            done
+          done
+          # A checksum file lets someone verify a mirror against this release without trusting
+          # either the mirror or GitHub.
+          ( cd release-assets && sha256sum -- * > SHA256SUMS.txt )
+          ls -l release-assets
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}（Linux）
+          prerelease: true
+          fail_on_unmatched_files: true
+          files: release-assets/*
+          body: |
+            DeepSeek Harness 桌面版 Linux 安装包，x64 与 arm64 各三种格式。
+
+            **自动更新**：客户端内置的更新源为 `https://sswwgzs.cn/dsh/`，安装后会自动从该地址检查更新，与本页面无关。本 Release 只是额外的分发与备份渠道。
+
+            **安装方式**
+            - AppImage：`chmod +x *.AppImage && ./<文件名>`
+            - deb：`sudo apt install ./<文件名>`
+            - tar.gz：解压后运行其中的 `deepseek-harness`
+
+            **架构选择**：x64 用于常规 PC / 服务器；arm64 用于飞腾、鲲鹏、ARM 虚拟机等机型。
+
+            附 `SHA256SUMS.txt` 用于校验镜像完整性。
