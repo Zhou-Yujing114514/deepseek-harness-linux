@@ -52,7 +52,7 @@
     "@deepseek-ai/schemastery": "workspace:~",
     "open": "^11.0.0",
     "serve-static": "^2.2.1",
-    "ws": "^8.21.0"
+    "ws": "^8.21.3"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
