@@ -182,7 +182,7 @@ jobs:
       # so a manifest problem never discards a twenty-minute build.
       - name: Upload packaged artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deepseek-harness-linux-${{ matrix.arch }}
           path: |
