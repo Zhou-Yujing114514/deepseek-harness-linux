@@ -10,7 +10,7 @@
 
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { cp, link, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, link, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -25,6 +25,38 @@ const run = promisify(execFile)
 const TARGETS = {
   'linux-x64': { arch: 'x64' },
   'linux-arm64': { arch: 'arm64' },
+}
+/**
+ * electron-builder spells the architecture differently per target: AppImage uses x86_64,
+ * deb uses amd64, and tar.gz keeps x64. Map every spelling back to the Node.js architecture.
+ */
+const ARCHITECTURE_SPELLINGS = new Map([
+  ['x86_64', 'x64'], ['x64', 'x64'], ['amd64', 'x64'],
+  ['arm64', 'arm64'], ['aarch64', 'arm64'], ['armv7l', 'arm64'],
+])
+
+/**
+ * Find the packaged artifacts of one version and architecture.
+ * @param {string} artifactsRoot Directory electron-builder wrote its artifacts to.
+ * @param {string} version Semantic version the completion record declared.
+ * @param {string} arch Target architecture.
+ * @returns {Promise<{ appImage: string, others: string[] }>} AppImage plus any other install formats.
+ */
+async function discoverArtifacts(artifactsRoot, version, arch) {
+  const escaped = version.replaceAll('.', String.raw`\.`)
+  const pattern = new RegExp(`^deepseek-harness-${escaped}-linux-([A-Za-z0-9_]+)\\.(AppImage|deb|tar\\.gz)$`, 'u')
+  const appImages = []
+  const others = []
+  for (const name of await readdir(artifactsRoot)) {
+    const match = pattern.exec(name)
+    if (match === null || ARCHITECTURE_SPELLINGS.get(match[1]) !== arch) continue
+    if (match[2] === 'AppImage') appImages.push(name)
+    else others.push(name)
+  }
+  if (appImages.length !== 1) {
+    throw new Error(`desktop self-hosted upload: expected exactly one ${arch} AppImage for ${version} in ${artifactsRoot}, found ${appImages.length}`)
+  }
+  return { appImage: appImages[0], others: others.sort() }
 }
 
 /** Read a required ambient setting; transport secrets never come from the dotenv file. */
@@ -112,9 +144,13 @@ async function upload(localDirectory, remoteRoot) {
 /** Delete superseded artifacts of the same architecture so the server keeps current versions. */
 async function prune(remoteRoot, arch, keep) {
   const listing = await remote(`ls -1 ${JSON.stringify(remoteRoot)}`)
-  const pattern = new RegExp(`^deepseek-harness-.*-linux-${arch}\\.`)
+  const pattern = /^deepseek-harness-.*-linux-([A-Za-z0-9_]+)\./u
   const stale = listing.stdout.split('\n').map(line => line.trim())
-    .filter(line => line !== '' && pattern.test(line) && !keep.includes(line))
+    .filter(line => line !== '' && !keep.includes(line))
+    .filter(line => {
+      const match = pattern.exec(line)
+      return match !== null && ARCHITECTURE_SPELLINGS.get(match[1]) === arch
+    })
   if (stale.length === 0) return []
   const quoted = stale.map(name => JSON.stringify(join(remoteRoot, name))).join(' ')
   await remote(`rm -f ${quoted}`)
@@ -166,13 +202,13 @@ export async function uploadSelfHostedTarget(argv) {
     throw new Error(`desktop self-hosted upload: ${target} was packaged for ${record.publicUrl}, not ${update.publicUrl}`)
   }
 
-  const base = `deepseek-harness-${version}-linux-${arch}`
-  const size = await fileSize(join(artifactsRoot, `${base}.AppImage`))
-  const digest = await sha512(join(artifactsRoot, `${base}.AppImage`))
-  process.stdout.write(`desktop self-hosted upload: ${target} ${version} (${size} bytes)\n`)
+  const { appImage, others } = await discoverArtifacts(artifactsRoot, version, arch)
+  const size = await fileSize(join(artifactsRoot, appImage))
+  const digest = await sha512(join(artifactsRoot, appImage))
+  process.stdout.write(`desktop self-hosted upload: ${target} ${version} ${appImage} (${size} bytes)\n`)
 
   const suffix = arch === 'x64' ? '' : `-${arch}`
-  const manifest = channelManifest(version, `${base}.AppImage`, digest, size)
+  const manifest = channelManifest(version, appImage, digest, size)
   const metadata = {
     [`nightly-linux${suffix}.yml`]: manifest,
     [`latest-linux${suffix}.yml`]: manifest,
@@ -182,7 +218,7 @@ export async function uploadSelfHostedTarget(argv) {
   await rm(stage, { recursive: true, force: true })
   await mkdir(stage, { recursive: true })
   const staged = []
-  for (const name of [`${base}.AppImage`, `${base}.AppImage.blockmap`, `${base}.deb`, `${base}.tar.gz`]) {
+  for (const name of [appImage, `${appImage}.blockmap`, ...others]) {
     if ((await stat(join(artifactsRoot, name)).catch(() => undefined))?.isFile() === true) {
       await stageFile(join(artifactsRoot, name), join(stage, name))
       staged.push(name)

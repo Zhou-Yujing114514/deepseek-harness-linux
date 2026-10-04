@@ -165,11 +165,6 @@ jobs:
       - name: Package Linux ${{ matrix.arch }} (AppImage + deb + tar.gz)
         run: pnpm --dir apps/desktop run package:linux:${{ matrix.arch }}
 
-      # The self-hosted feed (channel manifests plus the binaries they point at) is staged beside the
-      # artifacts so it can be published either by the publish job below or from a downloaded artifact.
-      - name: Stage the self-hosted update feed
-        run: pnpm --dir apps/desktop run stage:selfhost:linux:${{ matrix.arch }}
-
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -178,6 +173,21 @@ jobs:
             apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/artifacts/*
             apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/selfhost/*
           if-no-files-found: error
+          retention-days: 14
+
+      # Staged last on purpose: packaging already produced a downloadable artifact above, so a
+      # manifest problem can never cost the twenty-minute build.
+      - name: Stage the self-hosted update feed
+        run: pnpm --dir apps/desktop run stage:selfhost:linux:${{ matrix.arch }}
+
+      - name: Upload the staged self-hosted feed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deepseek-harness-linux-${{ matrix.arch }}-feed
+          path: |
+            apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/selfhost/*
+          if-no-files-found: warn
           retention-days: 14
 
   publish:
