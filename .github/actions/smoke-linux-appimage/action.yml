@@ -1,0 +1,46 @@
+# Boot the packaged AppImage before anything is allowed to publish it.
+#
+# Packaging validates its configuration and produces a well-formed file; neither says anything
+# about whether the application runs. A build whose manifest carries a mandatory-update policy
+# passes both and then greets the user with the fatal startup dialog, because main.ts throws
+# "desktop policy: unsupported platform" the moment that policy exists outside win32 and darwin.
+#
+# This action is the gate that turns that class of mistake into a red build instead of a bad
+# release: it launches the AppImage it was handed and fails unless a real window appears.
+name: Smoke-test the packaged Linux AppImage
+description: Launch a packaged Linux AppImage on a virtual display and fail if it does not start.
+
+inputs:
+  directory:
+    description: Directory holding the packaged AppImage to launch.
+    required: true
+  arch:
+    description: Architecture being tested, used to name the screenshot artefact.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install the display and Electron runtime dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        # xdotool reads the window list the gate decides on; the libraries are what Electron
+        # itself needs before it can reach the point of drawing a window.
+        sudo apt-get install -y --no-install-recommends \
+          xvfb x11-utils xdotool imagemagick \
+          libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libasound2 libgbm1 libdrm2 xauth
+
+    - name: Launch the packaged application
+      shell: bash
+      run: bash .github/actions/smoke-linux-appimage/smoke.sh "${{ inputs.directory }}"
+
+    - name: Keep the startup screenshot
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-appimage-smoke-${{ inputs.arch }}
+        path: ${{ runner.temp }}/dsh-smoke/*.png
+        if-no-files-found: ignore
+        retention-days: 14

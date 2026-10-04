@@ -20,12 +20,20 @@ on:
     paths:
       - 'apps/desktop/**'
       - '.github/workflows/desktop-linux.yml'
-      - '.github/actions/prepare-linux-env/**'
+      - '.github/actions/**'
+      # A version bump rewrites the workspace root manifest and every member of the dsh
+      # family; without this, bumping versions produced no build at all.
+      - 'package.json'
+      - 'pnpm-lock.yaml'
   pull_request:
     paths:
       - 'apps/desktop/**'
       - '.github/workflows/desktop-linux.yml'
-      - '.github/actions/prepare-linux-env/**'
+      - '.github/actions/**'
+      # A version bump rewrites the workspace root manifest and every member of the dsh
+      # family; without this, bumping versions produced no build at all.
+      - 'package.json'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
     inputs:
       origin:
@@ -187,6 +195,18 @@ jobs:
             apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/selfhost/*
           if-no-files-found: error
           retention-days: 14
+
+      # The gate between "a file was produced" and "a file may be published". Packaging
+      # validates its configuration and writes well-formed AppImages, and neither of those
+      # says anything about whether the application runs: rc.2 passed both and then opened
+      # the fatal startup dialog on every machine that installed it. Launching the build
+      # here turns that class of mistake into a red job, and publish (which needs: package)
+      # never gets to upload a package nobody can open.
+      - name: Smoke-test the packaged ${{ matrix.arch }} AppImage
+        uses: ./.github/actions/smoke-linux-appimage
+        with:
+          directory: apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/artifacts
+          arch: ${{ matrix.arch }}
 
   publish:
     name: Publish Linux feeds to the self-hosted server
