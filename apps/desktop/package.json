@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-desktop",
   "description": "Electron desktop shell for a bundled dsh runtime and external plugins",
-  "version": "0.2.0-rc.2",
+  "version": "0.2.0-rc.3",
   "homepage": "https://github.com/Zhou-Yujing114514/deepseek-harness-linux",
   "author": "Zhou-Yujing114514",
   "private": true,
