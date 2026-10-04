@@ -94,12 +94,21 @@ function channelManifest(version, filename, digest, size) {
   })}`
 }
 
-/** Build the ssh options shared by mkdir, rsync, scp, ls, and rm. */
-function sshOptions() {
-  const options = ['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new']
+/**
+ * Build the ssh options shared by mkdir, rsync, scp, ls, and rm.
+ * @param {string} command Transport the options feed: "scp" spells the port "-P", every
+ *   other ssh-family command spells it "-p" (scp would read "-p" as "preserve timestamps").
+ * @returns {string[]} Argument list for ssh, scp, or an rsync `-e` shell string.
+ */
+function sshOptions(command = 'ssh') {
+  // BatchMode suppresses every interactive prompt, which also starves sshpass: the password
+  // it types on the pty never reaches ssh. Keep it for key-only authentication, where a
+  // stray prompt would hang the publish step forever.
+  const batch = sshPassword() === undefined ? ['-o', 'BatchMode=yes'] : []
+  const options = [...batch, '-o', 'StrictHostKeyChecking=accept-new']
   const port = process.env.DSH_SELFHOST_SSH_PORT?.trim()
   const key = process.env.DSH_SELFHOST_SSH_KEY?.trim()
-  if (port !== undefined && port !== '') options.push('-p', port)
+  if (port !== undefined && port !== '') options.push(command === 'scp' ? '-P' : '-p', port)
   if (key !== undefined && key !== '') options.push('-i', key)
   return options
 }
@@ -109,12 +118,36 @@ function sshPassword() {
   return value === undefined || value === '' ? undefined : value
 }
 
+/**
+ * Repeat an idempotent remote step when the server drops the connection mid-transfer.
+ * Cheap tunnels reset under load; a publish should survive one reset instead of throwing away
+ * a twenty-minute build.
+ * @param {string} label Human-readable step name for the retry notice.
+ * @param {() => Promise<T>} operation Step to run; must be safe to repeat.
+ * @param {number} attempts Total tries before the failure is fatal.
+ * @returns {Promise<T>} Result of the first successful attempt.
+ * @template T
+ */
+async function withRetry(label, operation, attempts = 4) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      if (attempt >= attempts) throw error
+      const delay = attempt * 5000
+      process.stderr.write(`desktop self-hosted upload: ${label} failed (${error.message}); retry ${attempt}/${attempts - 1} in ${delay}ms\n`)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+}
+
 /** Run one command on the remote host, through sshpass when a password is the only credential. */
-async function remote(command) {
+function remote(command) {
   const argv = ['ssh', ...sshOptions(), requiredAmbient('DSH_SELFHOST_SSH_TARGET'), command]
   const password = sshPassword()
-  if (password === undefined) return run(argv[0], argv.slice(1), { maxBuffer: 1 << 24 })
-  return run('sshpass', ['-p', password, ...argv], { maxBuffer: 1 << 24 })
+  const argv0 = password === undefined ? argv[0] : 'sshpass'
+  const args = password === undefined ? argv.slice(1) : ['-p', password, ...argv]
+  return withRetry(`ssh ${command.slice(0, 40)}`, () => run(argv0, args, { maxBuffer: 1 << 24 }))
 }
 
 /** Put one large artifact beside its manifests without duplicating disk usage. */
@@ -125,19 +158,19 @@ async function stageFile(source, destination) {
 /** Push one staged directory to the remote document root. */
 async function upload(localDirectory, remoteRoot) {
   const target = requiredAmbient('DSH_SELFHOST_SSH_TARGET')
-  const options = sshOptions()
   const password = sshPassword()
   await remote(`mkdir -p ${JSON.stringify(remoteRoot)}`)
   const rsyncAvailable = await run('rsync', ['--version'], { maxBuffer: 1 << 20 }).then(() => true, () => false)
   // rsync needs a shell string for ssh; keep that path for key authentication only.
   if (rsyncAvailable && password === undefined) {
-    await run('rsync', ['-az', '--itemize-changes', '-e', ['ssh', ...options].join(' '),
-      `${localDirectory}/`, `${target}:${remoteRoot}/`], { maxBuffer: 1 << 24 })
+    await withRetry('rsync', () => run('rsync', ['-az', '--itemize-changes', '-e', ['ssh', ...sshOptions('ssh')].join(' '),
+      `${localDirectory}/`, `${target}:${remoteRoot}/`], { maxBuffer: 1 << 24 }))
     return 'rsync'
   }
-  const argv = ['-r', ...options, `${localDirectory}/.`, `${target}:${remoteRoot}/`]
-  if (password === undefined) await run('scp', argv, { maxBuffer: 1 << 24 })
-  else await run('sshpass', ['-p', password, 'scp', ...argv], { maxBuffer: 1 << 24 })
+  const argv = ['-r', ...sshOptions('scp'), `${localDirectory}/.`, `${target}:${remoteRoot}/`]
+  const argv0 = password === undefined ? 'scp' : 'sshpass'
+  const args = password === undefined ? argv : ['-p', password, 'scp', ...argv]
+  await withRetry('scp', () => run(argv0, args, { maxBuffer: 1 << 24 }))
   return 'scp'
 }
 
