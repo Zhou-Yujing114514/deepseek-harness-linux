@@ -347,16 +347,21 @@ jobs:
           done
           version=$(python3 -c "import glob, json; print(json.load(open(sorted(glob.glob('linux-x64/artifacts/*release.json'))[0]))['version'])")
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          mkdir -p release-assets
+          # softprops/action-gh-release matches `files:` relative to the workspace root, not to
+          # whatever directory this step cd'd into, so the staging directory has to be created
+          # there - building it under targets/ made the glob match nothing and failed the job
+          # after every package had already been published.
+          assets="$GITHUB_WORKSPACE/release-assets"
+          mkdir -p "$assets"
           for arch in x64 arm64; do
             for pattern in '*.AppImage' '*.deb' '*.tar.gz'; do
-              find "linux-$arch/artifacts" -maxdepth 1 -name "$pattern" -exec cp -a {} release-assets/ \;
+              find "linux-$arch/artifacts" -maxdepth 1 -name "$pattern" -exec cp -a {} "$assets/" \;
             done
           done
           # A checksum file lets someone verify a mirror against this release without trusting
           # either the mirror or GitHub.
-          ( cd release-assets && sha256sum -- * > SHA256SUMS.txt )
-          ls -l release-assets
+          ( cd "$assets" && sha256sum -- * > SHA256SUMS.txt )
+          ls -l "$assets"
 
       - name: Create the GitHub release
         uses: softprops/action-gh-release@v2
