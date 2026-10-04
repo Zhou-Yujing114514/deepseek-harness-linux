@@ -77,6 +77,8 @@ jobs:
           sed -i 's|^# DOWNLOAD_SELFHOST_PREFIX=.*|DOWNLOAD_SELFHOST_PREFIX=dsh|' apps/desktop/.env.linux
           sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
           sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
+          # The self-hosted deployment authenticates anonymously, so the login allow-list must go.
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_CONFIG=.*|# DSH_DESKTOP_MANDATORY_UPDATE_CONFIG omitted: anonymous self-hosted policy|' apps/desktop/.env.linux
 
       # The preflight in check:package probes FUSE 2; install it here too
       # (the package job installs it, but the check job also runs the preflight).
@@ -157,6 +159,8 @@ jobs:
           sed -i 's|^# DOWNLOAD_SELFHOST_PREFIX=.*|DOWNLOAD_SELFHOST_PREFIX=dsh|' apps/desktop/.env.linux
           sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
           sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
+          # The self-hosted deployment authenticates anonymously, so the login allow-list must go.
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_CONFIG=.*|# DSH_DESKTOP_MANDATORY_UPDATE_CONFIG omitted: anonymous self-hosted policy|' apps/desktop/.env.linux
 
       - name: Package Linux ${{ matrix.arch }} (AppImage + deb + tar.gz)
         run: pnpm --dir apps/desktop run package:linux:${{ matrix.arch }}
@@ -233,6 +237,8 @@ jobs:
           sed -i 's|^# DOWNLOAD_SELFHOST_PREFIX=.*|DOWNLOAD_SELFHOST_PREFIX=dsh|' apps/desktop/.env.linux
           sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
           sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
+          # The self-hosted deployment authenticates anonymously, so the login allow-list must go.
+          sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_CONFIG=.*|# DSH_DESKTOP_MANDATORY_UPDATE_CONFIG omitted: anonymous self-hosted policy|' apps/desktop/.env.linux
 
       - name: Publish both Linux feeds
         env:
