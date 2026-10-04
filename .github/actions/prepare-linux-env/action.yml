@@ -1,0 +1,38 @@
+# Shared release settings for every Linux Desktop job.
+#
+# Every job that packages or publishes has to write apps/desktop/.env.linux before it
+# can run, and the settings are identical everywhere. Keeping the sed block here means
+# the three jobs cannot drift apart.
+name: Prepare Linux release settings
+description: Write apps/desktop/.env.linux for a self-hosted Linux Desktop release.
+
+inputs:
+  origin:
+    description: HTTPS origin of the self-hosted update server.
+    required: true
+    default: https://sswwgzs.cn
+  prefix:
+    description: Directory under that origin serving binaries and channel metadata.
+    required: true
+    default: dsh
+
+runs:
+  using: composite
+  steps:
+    - name: Write .env.linux
+      shell: bash
+      env:
+        SELFHOST_ORIGIN: ${{ inputs.origin }}
+        SELFHOST_PREFIX: ${{ inputs.prefix }}
+      run: |
+        set -euo pipefail
+        cp apps/desktop/.env.linux.example apps/desktop/.env.linux
+        sed -i 's|^DSH_DESKTOP_AUTO_UPDATE_ENV=.*|DSH_DESKTOP_AUTO_UPDATE_ENV=selfhosted|' apps/desktop/.env.linux
+        sed -i 's|^# DOWNLOAD_SELFHOST_ORIGIN=.*|DOWNLOAD_SELFHOST_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
+        sed -i 's|^# DOWNLOAD_SELFHOST_PREFIX=.*|DOWNLOAD_SELFHOST_PREFIX='"$SELFHOST_PREFIX"'|' apps/desktop/.env.linux
+        sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://policy.example.invalid|' apps/desktop/.env.linux
+        sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=.*|DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN='"$SELFHOST_ORIGIN"'|' apps/desktop/.env.linux
+        # A self-hosted deployment authenticates anonymously, and an anonymous policy rejects
+        # allowedAuthOrigins, so the login allow-list from the example file must be dropped.
+        sed -i 's|^DSH_DESKTOP_MANDATORY_UPDATE_CONFIG=.*|# DSH_DESKTOP_MANDATORY_UPDATE_CONFIG omitted: anonymous self-hosted policy|' apps/desktop/.env.linux
+        grep -n 'AUTO_UPDATE_ENV\|SELFHOST\|MANDATORY_UPDATE' apps/desktop/.env.linux
