@@ -193,9 +193,13 @@ jobs:
     runs-on: ubuntu-24.04
     needs: package
     if: github.event_name != 'pull_request' && vars.DSH_SELFHOST_PUBLISH == 'true'
-    # A gigabyte-scale push to a distant server is slow; a hard ceiling keeps a stalled
-    # transfer from silently occupying the runner until the six-hour job limit.
-    timeout-minutes: 300
+    # A gigabyte-scale push to a distant server is slow, and the receiving host throttles
+    # inbound traffic, so a full publish is measured in hours rather than minutes. The
+    # hard ceiling keeps a stalled transfer from silently occupying the runner until the
+    # six-hour job limit. Pieces that already arrived stay in the staging area outside the
+    # document root, so a run that hits this ceiling resumes on the next attempt instead
+    # of resending a gigabyte from zero.
+    timeout-minutes: 350
     permissions:
       contents: read
     steps:
@@ -264,6 +268,11 @@ jobs:
           DSH_SELFHOST_SSH_KEY: ${{ secrets.DSH_SELFHOST_SSH_KEY }}
           DSH_SELFHOST_SSH_PASSWORD: ${{ secrets.DSH_SELFHOST_SSH_PASSWORD }}
           DSH_SELFHOST_REMOTE_ROOT: ${{ secrets.DSH_SELFHOST_REMOTE_ROOT }}
+          # Concurrent scp streams. The receiving host throttles inbound traffic, and a reset
+          # stream loses whatever it had already pushed, so fewer streams is not automatically
+          # slower. Leave the variable unset for the built-in default of 5; set it to retune a
+          # slow or failure-prone publish without editing the script or re-releasing anything.
+          DSH_SELFHOST_PARALLEL_STREAMS: ${{ vars.DSH_SELFHOST_PARALLEL_STREAMS }}
         run: |
           pnpm --dir apps/desktop run upload:selfhost:linux:x64
           pnpm --dir apps/desktop run upload:selfhost:linux:arm64
