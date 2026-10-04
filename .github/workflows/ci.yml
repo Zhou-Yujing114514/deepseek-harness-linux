@@ -71,7 +71,7 @@ jobs:
       - name: Redirect Node compile cache to runner temp
         run: echo "NODE_COMPILE_CACHE=${{ runner.temp }}/node-compile-cache" >> "$GITHUB_ENV"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
 
@@ -146,7 +146,7 @@ jobs:
       - name: Redirect Node compile cache to runner temp
         run: echo "NODE_COMPILE_CACHE=${{ runner.temp }}/node-compile-cache" >> "$GITHUB_ENV"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
 
@@ -200,7 +200,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
 
@@ -271,7 +271,7 @@ jobs:
       - name: Redirect Node compile cache to runner temp
         run: echo "NODE_COMPILE_CACHE=${{ runner.temp }}/node-compile-cache" >> "$GITHUB_ENV"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
 
@@ -413,7 +413,7 @@ jobs:
           echo "npm_config_devdir=$RUNNER_TEMP/node-gyp" >> "$GITHUB_ENV"
           echo "PNPM_CONFIG_STORE_DIR=$HOME/.local/share/pnpm/store" >> "$GITHUB_ENV"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
 
@@ -519,7 +519,7 @@ jobs:
         run: >-
           reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
           /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm-js-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
       - uses: actions/setup-node@v6
@@ -600,7 +600,7 @@ jobs:
         run: >-
           reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
           /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm-js-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
       - uses: actions/setup-node@v6
@@ -656,7 +656,7 @@ jobs:
         run: >-
           reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
           /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm-js-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
       - uses: actions/setup-node@v6
