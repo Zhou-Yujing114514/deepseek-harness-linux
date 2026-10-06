@@ -1,6 +1,8 @@
 # DeepSeek Harness · Linux 桌面版
 
-> 给官方 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 桌面端补上**一等公民级的 Linux 打包** —— 开箱即用的 AppImage / `.deb` / `.tar.gz`，覆盖 x64 与 arm64 双架构，配套原生 CI 与 AppImage 自动更新。
+> 给官方 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 桌面端补上**一等公民级的 Linux 打包** —— 开源（MIT）DeepSeek 桌面客户端，开箱即用的 AppImage / `.deb` / `.tar.gz`，覆盖 x64 与 arm64 双架构，配套原生 CI 与 AppImage 自动更新。
+
+**一句话定位**：在 Linux 上「能下载、能装、能更新」的 DeepSeek 桌面端（DeepSeek desktop for Linux）。完整保留官方 agent / 插件 / 联网能力，既可本地自托管运行 `dsh web`，也能装上原生桌面客户端，数据始终留在本机。
 
 官方桌面端只发布 macOS 与 Windows；Linux 用户要么退而用 Web 版，要么自己从源码硬编。本项目就是这个缺口的补完：在保留官方桌面全部功能的前提下，把 Linux 当成**正式支持平台**来打包、测试、分发。
 
@@ -8,6 +10,15 @@
 
 - ✅ **是**：一个下游 fork，专注做一件事——让 dsh 桌面端在 Linux 上「能下载、能装、能更新」。
 - ❌ **不是**：不是官方 DeepSeek 项目，也不魔改 agent 内核。agent 能力、插件体系、通信协议全部跟随上游。
+
+## 核心特性
+
+- 🐧 **Linux 原生支持**：首个把 DeepSeek 官方桌面端真正打包成 Linux 发行版的下游项目 —— Ubuntu / Debian / 树莓派 5 / ARM 服务器都能跑。
+- 📦 **三种安装包**：AppImage（单文件免安装、支持自动更新）、`.deb`（Debian / Ubuntu 原生包管理）、`.tar.gz`（便携解压即用）。
+- 🔄 **自动更新**：AppImage 通过 `electron-updater` 走 HTTPS 更新通道，下载时校验 SHA256。
+- 🧩 **功能完整**：agent 内核、插件体系、联网、前端全部跟随上游，Linux 下与官方体验一致（仅 Office 文档转换暂缺）。
+- 🏠 **可自托管**：本地运行 `dsh web` 或安装桌面端，数据留在本机，适合隐私敏感与内网场景。
+- 🆓 **开源免费**：基于上游 MIT 许可证分发。
 
 ## 产物一览
 
@@ -91,6 +102,16 @@ AppImage 通过 `electron-updater` 走 AppImage 更新通道，更新描述符�
 - 运行前请阅读上游 [SAFETY.md](https://github.com/deepseek-ai/deepseek-harness/blob/master/SAFETY.md)。
 - 未签名二进制存在供应链风险：只从本仓库 Release 下载，并核对 SHA256 校验和。
 - 自动更新通道未做代码签名验签，仅依赖 HTTPS + feed 元数据。
+
+## 找对地方了？
+
+如果你正在搜下面这些词，那本项目就是你要找的：
+
+- **DeepSeek Linux** / **DeepSeek on Linux** / **DeepSeek 桌面端 Linux**
+- **DeepSeek 客户端下载** / **DeepSeek 桌面客户端** / **DeepSeek desktop for Linux**
+- **DeepSeek AppImage** / **DeepSeek .deb** / **Ubuntu DeepSeek** / **Debian 安装 DeepSeek**
+- **树莓派 DeepSeek** / **ARM64 DeepSeek** / **DeepSeek Linux 安装包**
+- **开源 DeepSeek 客户端** / **self-hosted DeepSeek** / **本地运行 DeepSeek** / **Linux AI 助手**
 
 ## 许可证
 

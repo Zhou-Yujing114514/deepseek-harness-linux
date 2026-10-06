@@ -2,7 +2,9 @@
 
 [English](README.md) | 中文
 
-DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的开源 agent harness（智能体框架）。
+DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的开源 agent harness（智能体框架 / AI 智能体）。
+
+它既可以通过 `npx @deepseek-ai/dsh web` 在本机一键拉起 Web UI 自托管运行，也可以在 Linux（Ubuntu 24.04 / Debian / 树莓派 5 / ARM 服务器）上打包成桌面客户端（AppImage / `.deb` / `.tar.gz`）使用 —— 一个开源、可本地部署的 DeepSeek 客户端与 AI 助手框架。
 
 它构建于**一切皆插件**的架构之上，由 [Cordis](https://github.com/cordiverse/cordis) 驱动，其设计参见论文 [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512)。
 
@@ -101,6 +103,14 @@ pnpm --dir apps/desktop run package:linux:arm64              # ARM64：AppImage 
   howpublished={\url{https://github.com/deepseek-ai/deepseek-harness}},
 }
 ```
+
+## 如果你在搜索这些词
+
+- **DeepSeek Linux** / **DeepSeek 桌面端 Linux** / **DeepSeek on Linux**
+- **DeepSeek 客户端下载** / **DeepSeek 桌面客户端** / **DeepSeek 安装包**
+- **DeepSeek AppImage** / **DeepSeek .deb** / **Ubuntu 安装 DeepSeek** / **Debian DeepSeek**
+- **树莓派 DeepSeek** / **ARM64 DeepSeek** / **DeepSeek Linux 安装**
+- **开源 DeepSeek** / **本地部署 DeepSeek** / **自托管 AI 助手** / **DeepSeek 智能体**
 
 ## 许可证
 
