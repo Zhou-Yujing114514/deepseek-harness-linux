@@ -13,7 +13,7 @@
 
 ## 核心特性
 
-- 🐧 **Linux 原生支持**：首个把 DeepSeek 官方桌面端真正打包成 Linux 发行版的下游项目 —— Ubuntu / Debian / 树莓派 5 / ARM 服务器都能跑。
+- 🐧 **Linux 原生支持**：为 DeepSeek 官方桌面端提供一等公民级 Linux 桌面端打包的下游项目 —— Ubuntu / Debian / 树莓派 5 / ARM 服务器都能跑。
 - 📦 **三种安装包**：AppImage（单文件免安装、支持自动更新）、`.deb`（Debian / Ubuntu 原生包管理）、`.tar.gz`（便携解压即用）。
 - 🔄 **自动更新**：AppImage 通过 `electron-updater` 走 HTTPS 更新通道，下载时校验 SHA256。
 - 🧩 **功能完整**：agent 内核、插件体系、联网、前端全部跟随上游，Linux 下与官方体验一致（仅 Office 文档转换暂缺）。
