@@ -1,10 +1,10 @@
 # DeepSeek Harness · Linux 桌面版
 
-> 给官方 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 桌面端补上**一等公民级的 Linux 打包** —— 开源（MIT）DeepSeek 桌面客户端，开箱即用的 AppImage / `.deb` / `.tar.gz`，覆盖 x64 与 arm64 双架构，配套原生 CI 与 AppImage 自动更新。
+> 给官方 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 桌面端补上**社区 Linux 桌面端打包** —— 开源（MIT）DeepSeek 桌面客户端，开箱即用的 AppImage / `.deb` / `.tar.gz`，覆盖 x64 与 arm64 双架构，配套原生 CI 与 AppImage 自动更新。
 
 **一句话定位**：在 Linux 上「能下载、能装、能更新」的 DeepSeek 桌面端（DeepSeek desktop for Linux）。完整保留官方 agent / 插件 / 联网能力，既可本地自托管运行 `dsh web`，也能装上原生桌面客户端，数据始终留在本机。
 
-官方桌面端只发布 macOS 与 Windows；Linux 用户要么退而用 Web 版，要么自己从源码硬编。本项目就是这个缺口的补完：在保留官方桌面全部功能的前提下，把 Linux 当成**正式支持平台**来打包、测试、分发。
+官方桌面端只发布 macOS 与 Windows；Linux 用户要么退而用 Web 版，要么自己从源码硬编。本项目就是这个缺口的补完：在保留官方桌面全部功能的前提下，把 Linux 作为**社区支持平台**来打包、测试、分发。
 
 ## 这是什么 / 不是什么
 
@@ -26,9 +26,9 @@
 
 | 格式 | 用途 | 典型文件名 |
 |------|------|-----------|
-| **AppImage** | 单文件免安装，支持自动更新 | `deepseek-harness-0.2.0-rc.2-linux-x64.AppImage` |
-| **.deb** | Debian / Ubuntu 系原生包管理 | `deepseek-harness-0.2.0-rc.2-linux-x64.deb` |
-| **.tar.gz** | 便携解压即用 | `deepseek-harness-0.2.0-rc.2-linux-x64.tar.gz` |
+| **AppImage** | 单文件免安装，支持自动更新 | `deepseek-harness-0.2.0-rc.3-linux-x64.AppImage` |
+| **.deb** | Debian / Ubuntu 系原生包管理 | `deepseek-harness-0.2.0-rc.3-linux-x64.deb` |
+| **.tar.gz** | 便携解压即用 | `deepseek-harness-0.2.0-rc.3-linux-x64.tar.gz` |
 
 支持架构：`x64`（AMD / Intel）、`arm64`（树莓派 5、Apple Silicon 上的 Linux、ARM 服务器等）。
 
@@ -94,8 +94,8 @@ AppImage 通过 `electron-updater` 走 AppImage 更新通道，更新描述符�
 ## 与上游的关系
 
 - 上游：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（MIT，DeepSeek-AI）。
-- 本仓库是其下游 fork：**agent 内核与官方保持同步**，新增内容仅限于 Linux 打包层——CI 工作流、electron-builder 配置、类型声明补全、POSIX launcher 兼容、桌面端打包说明与单元测试用例。
-- 计划将 Linux 打包支持以 PR / Discussion 形式回喂上游，让官方原生支持 Linux 桌面。
+- 本仓库是其下游 fork：**agent 内核与官方保持同步**，新增内容仅限于 Linux 打包层——CI 工作流、electron-builder 配置、类型声明补全、POSIX launcher 兼容、桌面端打包说明与冒烟测试脚本。
+- 后续希望将 Linux 打包经验整理后反馈给上游，供官方参考。
 
 ## 安全须知
 
