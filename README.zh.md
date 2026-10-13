@@ -1,6 +1,9 @@
-# DeepSeek Harness
+# DeepSeek Harness · Linux 桌面端
 
 [English](README.md) | 中文
+
+> **本仓库说明**：这是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的下游社区项目，专注于 Linux 桌面端打包适配。官方桌面端仅提供 macOS / Windows，本仓库在此基础上新增 Linux（x64 / ARM64）的 AppImage / .deb / .tar.gz 打包与自动构建。agent 内核、插件体系等核心功能均来自上游，本仓库不做修改。
+
 
 DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的开源 agent harness（智能体框架 / AI 智能体）。
 
@@ -37,8 +40,8 @@ npx @deepseek-ai/dsh web
 如需从仓库源码运行：
 
 ```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
+git clone https://github.com/Zhou-Yujing114514/deepseek-harness-linux.git
+cd deepseek-harness-linux
 pnpm install
 pnpm run build
 pnpm dsh web
@@ -46,7 +49,7 @@ pnpm dsh web
 
 `pnpm run build` 会准备仓库产物。`pnpm dsh web` 会直接使用这些已构建产物，不会重新构建。
 
-### Linux 桌面端
+### Linux 桌面端（本仓库新增）
 
 桌面应用可在 Ubuntu 24.04（或兼容发行版）上打包，支持两种架构（x64/ARM64），每种架构产出三种安装格式（AppImage、Debian `.deb`、便携 `.tar.gz`）：
 
