@@ -32,7 +32,7 @@
     "@deepseek-ai/dsh-llm-replay": "workspace:*",
     "@deepseek-ai/dsh-loader-smoke": "workspace:*",
     "@deepseek-ai/dsh-session-format": "workspace:*",
-    "js-yaml": "^4.3.2",
+    "js-yaml": "^5.4.2",
     "vitest": "^4.1.11"
   },
   "peerDependencies": {
