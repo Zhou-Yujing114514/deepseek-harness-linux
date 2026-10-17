@@ -146,7 +146,7 @@ jobs:
         run: node --import tsx apps/desktop/scripts/publish-desktop-ci.ts --publish
       - name: Retain publication audit
         if: always() && steps.publish.outputs.record != ''
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v6
         with:
           name: desktop-publication-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.publish.outputs.record }}/
