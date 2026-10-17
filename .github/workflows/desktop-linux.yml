@@ -242,7 +242,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download packaged artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: deepseek-harness-linux-*
           path: apps/desktop/.desktop-build/targets
@@ -317,7 +317,7 @@ jobs:
           clean: true
 
       - name: Download packaged artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: deepseek-harness-linux-*
           path: apps/desktop/.desktop-build/targets
