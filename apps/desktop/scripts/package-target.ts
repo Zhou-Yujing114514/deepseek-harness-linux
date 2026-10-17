@@ -220,6 +220,7 @@ interface DesktopPackageInvocation {
   readonly directory: boolean
   readonly prepareOnly: boolean
   readonly unsigned: boolean
+  readonly skipNotarization: boolean
   readonly check: boolean
   /** Build identifier to publish under, when this build does not publish the product version. */
   readonly requestedBuildVersion: string | undefined
@@ -252,6 +253,7 @@ export function parseDesktopPackageInvocation(
       dir: { type: 'boolean', default: false },
       'prepare-only': { type: 'boolean', default: false },
       unsigned: { type: 'boolean', default: false },
+      'skip-notarization': { type: 'boolean', default: false },
       check: { type: 'boolean', default: false },
       'build-version': { type: 'string' },
     },
@@ -269,6 +271,7 @@ export function parseDesktopPackageInvocation(
     directory: values.dir,
     prepareOnly: values['prepare-only'],
     unsigned: values.unsigned,
+    skipNotarization: values['skip-notarization'],
     check: values.check,
     requestedBuildVersion,
   }

@@ -56,7 +56,7 @@ export function resolveDesktopAutoUpdateEnvironment(
  * @param arch - Target Node.js architecture.
  * @returns Update target directory.
  */
-export function resolveDesktopUpdateTarget(
+export function resolveDesktopAutoUpdateTarget(
   platform: NodeJS.Platform,
   arch: string,
 ): DesktopUpdateTarget

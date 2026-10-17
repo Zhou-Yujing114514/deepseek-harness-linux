@@ -7,10 +7,12 @@ import { readDesktopRuntime, verifyDesktopRuntime } from '../src/runtime-tree.ts
 import { verifyWindowsCode } from './windows-runtime-signature.mjs'
 import { smokePreparedRuntime } from './smoke-prepared-runtime.ts'
 import { resolveDesktopPackageTarget } from './package-target.ts'
+import type { DesktopUpdateTarget } from './desktop-auto-update-environment.mjs'
 
 const paths = resolveDesktopTargetBuildPaths()
 const { values } = parseArgs({ options: { unsigned: { type: 'boolean', default: false } }, allowPositionals: false })
-const target = resolveDesktopBuildTarget()
+// This fork adds Linux targets; the official build-target type only covers macOS and Windows.
+const target = resolveDesktopBuildTarget() as DesktopUpdateTarget
 const windows = target === 'win-x64'
 const linux = target === 'linux-x64' || target === 'linux-arm64'
 if (values.unsigned && !windows) throw new Error('desktop smoke: unsigned artifacts require Windows')
