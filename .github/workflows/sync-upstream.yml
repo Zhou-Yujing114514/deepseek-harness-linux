@@ -36,6 +36,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # A sync almost always touches upstream's own workflow files, and pushing changes under
+  # .github/workflows/ needs this scope — without it the push is rejected outright.
+  workflows: write
 
 concurrency:
   group: sync-upstream
