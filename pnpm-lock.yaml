@@ -8572,7 +8572,7 @@ importers:
         version: link:../../session/working-directory
       sharp:
         specifier: ^0.35.3
-        version: 0.35.5(@types/node@22.20.1)
+        version: 0.35.4(@types/node@22.20.1)
 
   packages/experimental/cua-macos:
     dependencies:
@@ -8675,7 +8675,7 @@ importers:
         version: link:../../session/working-directory
       sharp:
         specifier: ^0.35.3
-        version: 0.35.5(@types/node@22.20.1)
+        version: 0.35.4(@types/node@22.20.1)
 
   packages/experimental/hook-protocol:
     devDependencies:
@@ -16103,8 +16103,8 @@ importers:
         specifier: ^2.0.17
         version: 2.0.17(mermaid@11.17.2)(vitepress@1.6.4(@algolia/client-search@5.55.2)(@types/node@22.20.1)(@types/react@18.3.31)(lightningcss@1.33.0)(postcss@8.5.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@6.0.3))
       vue:
-        specifier: 3.5.42
-        version: 3.5.42(typescript@6.0.3)
+        specifier: 3.5.43
+        version: 3.5.43(typescript@6.0.3)
 
 packages:
 
@@ -17380,10 +17380,22 @@ packages:
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
     engines: {node: '>=18'}
 
+  '@img/sharp-darwin-arm64@0.35.4':
+    resolution: {integrity: sha512-Uhfl4V4lhP2nbUVF9+hyH1+luj86f1gUFeo8ALYxFoULoU+G87D43BfeMP8XHsk9boxAnCY/bf2EHwhA7MuGsA==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm64]
+    os: [darwin]
+
   '@img/sharp-darwin-arm64@0.35.5':
     resolution: {integrity: sha512-QRUlFQ0WxvdWyqqG/WtI3iupfD5rBzmCHXSdPsY91sAtVtTo7Q4cb6zOccZ3gqEqkr0f1As1ehLqmEpDsRf+lg==}
     engines: {node: '>=20.9.0'}
     cpu: [arm64]
+    os: [darwin]
+
+  '@img/sharp-darwin-x64@0.35.4':
+    resolution: {integrity: sha512-hWniXY3bG5qKpkKrAwPe4y+VTPmf086YQAnkxWh7uA1YrlRouWGa0M0Mxj3ZjnXFkv7/TD1bTy9lGUK26vRvWw==}
+    engines: {node: '>=20.9.0'}
+    cpu: [x64]
     os: [darwin]
 
   '@img/sharp-darwin-x64@0.35.5':
@@ -17392,14 +17404,29 @@ packages:
     cpu: [x64]
     os: [darwin]
 
+  '@img/sharp-freebsd-wasm32@0.35.4':
+    resolution: {integrity: sha512-lIsKw/BU+kjB4eZjxrYrZmwOJYi3Ajrv66iAlBmUPyKc3HpnloevB1g3wxGD9P/5BbQ1brBGl65VRRrCvQDEqA==}
+    engines: {node: '>=20.9.0'}
+    os: [freebsd]
+
   '@img/sharp-freebsd-wasm32@0.35.5':
     resolution: {integrity: sha512-Y/z91nEZ4uIBX5X3nfTovjU9lHNKFYbL2lpHCLVNmXQK03VIZvXBBt0KxbPGp2SdGSF+2mQU4e+hQaWOt86iAw==}
     engines: {node: '>=20.9.0'}
     os: [freebsd]
 
+  '@img/sharp-libvips-darwin-arm64@1.3.3':
+    resolution: {integrity: sha512-suTBPTDGrI9WodccaDdwZItTSaBYASlBk1NSfElSHrUfzu3szG6lvIF58+WiFvnfzuK8ZBFS5zE00PxqxnRiPg==}
+    cpu: [arm64]
+    os: [darwin]
+
   '@img/sharp-libvips-darwin-arm64@1.3.4':
     resolution: {integrity: sha512-5R89nBYiRdUlSWJxPhO+GVtaXzXSxKnRu/xqMn3KTA3L9EB9Oy/P+Nn2f2vlhPuUdy/Zusb2DarbyTpGCfEDuw==}
     cpu: [arm64]
+    os: [darwin]
+
+  '@img/sharp-libvips-darwin-x64@1.3.3':
+    resolution: {integrity: sha512-FVJZ5mITMobmXIz/hPDTw0EintTW5H3WfrxwLqEqjiIihlu+hVRyGrFQ60xl0Lxn7Bt3zdpevPaQi0HEzqz9fw==}
+    cpu: [x64]
     os: [darwin]
 
   '@img/sharp-libvips-darwin-x64@1.3.4':
@@ -17407,9 +17434,21 @@ packages:
     cpu: [x64]
     os: [darwin]
 
+  '@img/sharp-libvips-linux-arm64@1.3.3':
+    resolution: {integrity: sha512-0DaL0A6Xu6sQSQFwe4iVCrKWU2cCTItnRsYsCdxAMm9NF6twAA9BKnoqy4hqz4+azQ0JHuA26qiUKsf1XJ/v5A==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
   '@img/sharp-libvips-linux-arm64@1.3.4':
     resolution: {integrity: sha512-Y3dgX/6lE2QhQb+Gxy0WZxfg9MEm/JBjamZpS2IklP7xIQoKN4hzAm7KcMVGtaVDt3neE9OKBC7vAfonA/Lr1A==}
     cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@img/sharp-libvips-linux-arm@1.3.3':
+    resolution: {integrity: sha512-3rbU4vqXXc3hY/OiXdl52xZvT0F1yEngWfvqudtPJg/KkyiaQw2DRsFrNzpmLvfavbwOq3qXn36GP8obHRULQA==}
+    cpu: [arm]
     os: [linux]
     libc: [glibc]
 
@@ -17419,9 +17458,21 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@img/sharp-libvips-linux-ppc64@1.3.3':
+    resolution: {integrity: sha512-cdn1OvUBwsXhbC0zSzJnNzf5MZ/mTrobawDvNXBTxe8VtqKAm0sRuEY2Evzovb/w9JMk4TvRxqt1mekSuJz64w==}
+    cpu: [ppc64]
+    os: [linux]
+    libc: [glibc]
+
   '@img/sharp-libvips-linux-ppc64@1.3.4':
     resolution: {integrity: sha512-Le6boB8Tai0Nis+gIxIpKx68UDVVIqdR8Tin5Yf1z2LJJQLDJvCDRqRu+jC2qCoD+eIomonmOwB4smBRxfVpYQ==}
     cpu: [ppc64]
+    os: [linux]
+    libc: [glibc]
+
+  '@img/sharp-libvips-linux-riscv64@1.3.3':
+    resolution: {integrity: sha512-HjPVx7yKz+0lqdhDlTw1tt90wamBoxhiXpvl1XZpJLiHH4RCJ5yDTqH+VlYPv2fwFs89JFw4c1IexYOcQUi4IQ==}
+    cpu: [riscv64]
     os: [linux]
     libc: [glibc]
 
@@ -17431,9 +17482,21 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@img/sharp-libvips-linux-s390x@1.3.3':
+    resolution: {integrity: sha512-neWLh+3yCNThxnfy3c4BbVBeGgt9aftno+XbT56iK28RgeDs3UOFWviLWlUu0bArYVYJaFDK+RRohbicUNCm8Q==}
+    cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
   '@img/sharp-libvips-linux-s390x@1.3.4':
     resolution: {integrity: sha512-ra/mB6MikESDUO7Yg+Mi95bFBb9GsObURuhnOv3OqknjGe9sZrG8tCe9q0xSIGrtLgvgw0gKnFWcK4blSgQOuQ==}
     cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
+  '@img/sharp-libvips-linux-x64@1.3.3':
+    resolution: {integrity: sha512-4vKmvAst9nrowcqquKFAyZJUDolUaIp8uRiN0mWFguJ1IplC9/pitXtlnnlU4aa/eJw3J7i67V+pwUL+wZGdsA==}
+    cpu: [x64]
     os: [linux]
     libc: [glibc]
 
@@ -17443,9 +17506,21 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@img/sharp-libvips-linuxmusl-arm64@1.3.3':
+    resolution: {integrity: sha512-Y9kQaLMuNoB0bPYOOdcZMaseNrFpPodIWWMrx+CZyydf2xn68j9WYc6sWWRrDwNkzCQjKYfc68L7jKjGlHMibw==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
   '@img/sharp-libvips-linuxmusl-arm64@1.3.4':
     resolution: {integrity: sha512-hvulFwtjUcagsis6BBxHwGFwWoNZjgYmULGVrZcyfNbjA8hKILbRxGg15/7w5HDyXHXUos/j6baAWqnCyQ2DWA==}
     cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@img/sharp-libvips-linuxmusl-x64@1.3.3':
+    resolution: {integrity: sha512-fj8Mv0HHfD1Rr+4I68+3agJynxDWtBFgicTbSOb9Bke6pIwzGcJ+RX/yHjmiEGFMCavY/dxvem7MyNaJF+wDiw==}
+    cpu: [x64]
     os: [linux]
     libc: [musl]
 
@@ -17455,10 +17530,24 @@ packages:
     os: [linux]
     libc: [musl]
 
+  '@img/sharp-linux-arm64@0.35.4':
+    resolution: {integrity: sha512-De4jpEnAU8Hd5oT0j1G3uL4ZvTuipVMn7YC6vPaJhy6/7EwEae0SVAoBrUMYQbkLGDm85taVWwuPc1a44LTzCQ==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
   '@img/sharp-linux-arm64@0.35.5':
     resolution: {integrity: sha512-LYVx5JTsOM2CBzmxreh+nl64/3H6Xb09iSLknqH47z2T2DFFxDeFLP5y4dJwe6H7uGQlHPyEEtIqyo3DYsRwdQ==}
     engines: {node: '>=20.9.0'}
     cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@img/sharp-linux-arm@0.35.4':
+    resolution: {integrity: sha512-7OAS8gI0EReKGVN2HssHlM6umJgxF5VI3xN0p9FA91p/YO+ou5hiNghLdZ5BEHztwaaK5+bLKRf8x/o2L2nk9A==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm]
     os: [linux]
     libc: [glibc]
 
@@ -17469,10 +17558,24 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@img/sharp-linux-ppc64@0.35.4':
+    resolution: {integrity: sha512-2oYZJeIl4kCcMGk4ouZVjnkCtFrpQFlNEtJ6GbxzhHQchwH0NH/qEb9ykmOl29dqwMq+JhFdZn+1ak2FKhI9fQ==}
+    engines: {node: '>=20.9.0'}
+    cpu: [ppc64]
+    os: [linux]
+    libc: [glibc]
+
   '@img/sharp-linux-ppc64@0.35.5':
     resolution: {integrity: sha512-QVxAAq8evVRI9ia2vqgwrmWucn5Dfv+JdWzj75pD8omHLPSP7f8p20O8jxzjCcuCEQEOtYOZUmX1hkiZ0kdevA==}
     engines: {node: '>=20.9.0'}
     cpu: [ppc64]
+    os: [linux]
+    libc: [glibc]
+
+  '@img/sharp-linux-riscv64@0.35.4':
+    resolution: {integrity: sha512-cPbNChoRURAWdebDIHSenxRpgEdy7JkPydSnUxRm9VvKD7m0/xVaR/8Fzlu81pk5nHEvHH87UZUA7cTtwnbJSA==}
+    engines: {node: '>=20.9.0'}
+    cpu: [riscv64]
     os: [linux]
     libc: [glibc]
 
@@ -17483,10 +17586,24 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@img/sharp-linux-s390x@0.35.4':
+    resolution: {integrity: sha512-RY0JFY8Fd6RonCBtHz+DvadaPkXDSI1AUn6yWL9TipqkZ1vY8w8evqdgyDFnkm4/K1ve1TvZiaePP5oSd4+WVQ==}
+    engines: {node: '>=20.9.0'}
+    cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
   '@img/sharp-linux-s390x@0.35.5':
     resolution: {integrity: sha512-UZasTOFiYzotTsGOCu42BfUzP6Tu6Do/947iRm1RsLKvlllxwGcn4RN27LibGWceix4Y+Pmw3jsnTcCQIgWjqA==}
     engines: {node: '>=20.9.0'}
     cpu: [s390x]
+    os: [linux]
+    libc: [glibc]
+
+  '@img/sharp-linux-x64@0.35.4':
+    resolution: {integrity: sha512-9qvvEAuk8k89TfWUoX2htWjbAMX8p+NxCppjpcg5k6xMsjhBQPTsoIh36h9Qde4WRuGpJeYnOjdosDn/cnv+OA==}
+    engines: {node: '>=20.9.0'}
+    cpu: [x64]
     os: [linux]
     libc: [glibc]
 
@@ -17497,10 +17614,24 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@img/sharp-linuxmusl-arm64@0.35.4':
+    resolution: {integrity: sha512-KB5jxpfWQTr0nc3xdHtWChdbifHrBGsd2SM62Eyxrl8afikm+f5qGBU75SJIZBT/S1MC8XyacdlXBMSWq6OURA==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
   '@img/sharp-linuxmusl-arm64@0.35.5':
     resolution: {integrity: sha512-9HbMclmI1zlNkFRs3z9/eBtDjfD0sGlrX1z6b1qwmiFY5ElDLh4BC0LPBdVp7z1DXFiKlIcznf+ZlsuZzLxQqg==}
     engines: {node: '>=20.9.0'}
     cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@img/sharp-linuxmusl-x64@0.35.4':
+    resolution: {integrity: sha512-f+eZJZIQNEEd26RPSW+76chwOf1XtA2Y/O+5ocVyLliHkeih3e+jhLVBdNTd2rS3IbNXK8+ug93Vf5ZXtF5Lxg==}
+    engines: {node: '>=20.9.0'}
+    cpu: [x64]
     os: [linux]
     libc: [musl]
 
@@ -17511,14 +17642,29 @@ packages:
     os: [linux]
     libc: [musl]
 
+  '@img/sharp-wasm32@0.35.4':
+    resolution: {integrity: sha512-zQnl4Kwp7Q6NHsENtU2T/00Zi+w3AQNwz3+UaTyVBy2FpXrzXzGjndpK61onhZjRtRpQXxCTeqw19bVyXOh7jA==}
+    engines: {node: '>=20.9.0'}
+
   '@img/sharp-wasm32@0.35.5':
     resolution: {integrity: sha512-Ptsga1su4tQx+LLF1ECS9U6nz5kmrXKo6XVbtR48Ke3ZRxxgaWBu7IDtEe1quo8hiupwm6WFqxVlXaSf7IINGQ==}
     engines: {node: '>=20.9.0'}
+
+  '@img/sharp-webcontainers-wasm32@0.35.4':
+    resolution: {integrity: sha512-ESfNkywmCfPNyaZjxooddJQiQ+l/nTpGEOGthxiLnIHXC/CmcBixnfwUleX9mCz9ovrUUvKMap/pm8RYbzfwaA==}
+    engines: {node: '>=20.9.0'}
+    cpu: [wasm32]
 
   '@img/sharp-webcontainers-wasm32@0.35.5':
     resolution: {integrity: sha512-hfhF/FmoQyTUkA0bIKFOtw536BQSeBMe6BF6QyWlrPxT754+TFLaZ7sKKTfvvM0yJgKgaYTwnFCIZ/GuDw5SUA==}
     engines: {node: '>=20.9.0'}
     cpu: [wasm32]
+
+  '@img/sharp-win32-arm64@0.35.4':
+    resolution: {integrity: sha512-iNdlBX9gLVvqe2I3uIJSIKTq6wckP/DYxZtcqxm09x5Gi24DnFBmPAWZmr60ZyYMG0xlzo6goG3670ar+RXvRw==}
+    engines: {node: '>=20.9.0'}
+    cpu: [arm64]
+    os: [win32]
 
   '@img/sharp-win32-arm64@0.35.5':
     resolution: {integrity: sha512-X4t7g+7ZA5DKblCBEXGjUqqemj4vczING/5viFwAL8h4N3qYeyjwdCvRLHi4EdOUI+2Z7UFlp1VM+p/AuEtm6Q==}
@@ -17526,10 +17672,22 @@ packages:
     cpu: [arm64]
     os: [win32]
 
+  '@img/sharp-win32-ia32@0.35.4':
+    resolution: {integrity: sha512-kqRsbaa5CS6KHlpxnN7WhE6vAAugXyZButpRdvDWetlv6Qv4N9WTcrWzF7tXfB9T7MsoadqdI8hmwLq6UlLvtw==}
+    engines: {node: ^20.9.0}
+    cpu: [ia32]
+    os: [win32]
+
   '@img/sharp-win32-ia32@0.35.5':
     resolution: {integrity: sha512-5Zm82LoBc43nhwNybZlG7Y1KO//Zhsn306fQl29ZOuStHLGTo3BWL83q3cznX0poxSAMuYL1On/BHBxkBeKr6A==}
     engines: {node: ^20.9.0}
     cpu: [ia32]
+    os: [win32]
+
+  '@img/sharp-win32-x64@0.35.4':
+    resolution: {integrity: sha512-XtmnYhBcrORsJ4XJngyzr/EWP0hRZLAZRFaApdKuviyqF78+ylxh2y06ZmtULAMOnObJ3ucpN0AcwSWnMowTRg==}
+    engines: {node: '>=20.9.0'}
+    cpu: [x64]
     os: [win32]
 
   '@img/sharp-win32-x64@0.35.5':
@@ -17786,10 +17944,12 @@ packages:
 
   '@modelcontextprotocol/server-everything@2026.8.31':
     resolution: {integrity: sha512-5U3OZh8Xq0Li4nA26l6uNvV9/1suMDuWSn+NjLZIhzinhMY6N3A4DCrxVecBGPf2PsNFKTEv5krxGPRwzxc7jQ==}
+    deprecated: 'Date-based versions are no longer published. This package has resumed semantic versioning at 1.0.0: install the latest version.'
     hasBin: true
 
   '@modelcontextprotocol/server-filesystem@2026.8.31':
     resolution: {integrity: sha512-kKaFkyAh6oipvc9+EAbJ552JafnMnOq5nzmzWkp1jJdBhTAAGpmIpWihUG1+rfNhmEFM98gUZDdCHCDD4v6a7Q==}
+    deprecated: 'Date-based versions are no longer published. This package has resumed semantic versioning at 1.0.0: install the latest version.'
     hasBin: true
 
   '@modelcontextprotocol/server@2.2.0':
@@ -18754,6 +18914,10 @@ packages:
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
 
+  '@smithy/core@3.34.1':
+    resolution: {integrity: sha512-dLcOUxz8YCv1RZUMKq6GbyUf95pLbrqh34bPvpCZ1+CByFF31BEAFewZjsGCnVsZTKdThNENfGyAgk2TJqVwSw==}
+    engines: {node: '>=18.0.0'}
+
   '@smithy/core@3.35.0':
     resolution: {integrity: sha512-zRMhfkByhT2snNdr1si24vJitU6Cr9ix2MikUfWmkAgp4jrNP0GcKSP5YvwQ+TlI8AZXER5QOGJn3JsVtSD9/A==}
     engines: {node: '>=18.0.0'}
@@ -18770,8 +18934,16 @@ packages:
     resolution: {integrity: sha512-ThMkboGeONWXAelq9FvGsuJC4rOi+qyC4/zhUF58xYpxUg5sQKx2VXZYJmtNjr4dSuBJ1HeJXETQILCz3wOHvw==}
     engines: {node: '>=18.0.0'}
 
+  '@smithy/signature-v4@5.7.3':
+    resolution: {integrity: sha512-7ImGm+FkHRLcBaRttIAMZ6bzJZWb2cJGoYjq46F2UjycujWzrL9GEN9h4w7eQyXJYnltrUhxbbieBAIRrdqpow==}
+    engines: {node: '>=18.0.0'}
+
   '@smithy/signature-v4@5.7.4':
     resolution: {integrity: sha512-tHy0K0VtqNd5Y7Y41h0a0Lhh0L1GzC08dTWg0F7vRJWFtTENg7IZikf3wQkanYIRdb7ngoIPMTmqgUi401fEeQ==}
+    engines: {node: '>=18.0.0'}
+
+  '@smithy/types@4.18.0':
+    resolution: {integrity: sha512-CgB6HHWer/vrKps24ulRIbpcpb7K4xAU7SkZ7YHzBPlwHsvsrCJFEXK421s+cJzX+ZrqtA/TuU5w1HzI7k9N8A==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/types@4.19.0':
@@ -19339,17 +19511,17 @@ packages:
   '@vscode/ripgrep@1.18.0':
     resolution: {integrity: sha512-ns5lWe44tSfbTMbVUsyB+I1819PVSw4AdpgK0RNkzfWfwy6+3IUNSxwSrfTno1/oWaS/hERNz+XLWVyga2aJBQ==}
 
-  '@vue/compiler-core@3.5.42':
-    resolution: {integrity: sha512-2Ye1ilMtKXxl8qZUrQ5j0CdgenFp/HFQmta6rfRyfEsTG69L6Wk+tWuNoHYHMx9E8tF2Slvdg1FuwDvAXdy1LQ==}
+  '@vue/compiler-core@3.5.43':
+    resolution: {integrity: sha512-zdiLhnbe1QQqgDT8xZMpNmyqZ3qlI+/Q/FHQco57Kwl/b05HhCzN6eVGN9QU9rbga4CrS0H5SYY8VGHZCt/1Hg==}
 
-  '@vue/compiler-dom@3.5.42':
-    resolution: {integrity: sha512-qbhQZEFmycr+ni/qyuccS4sucNN7VAbDfbkvNxWOX2VfgFm90MNs3/UhRNKoPMEIVn0F8gdlYjLPvqxHwHeQOA==}
+  '@vue/compiler-dom@3.5.43':
+    resolution: {integrity: sha512-PEZoAk3NQmsn/ejMzSOCyTYqwGqczrWm70PuhBKjjv1+TCoQAaO/zOqNwjV+honlNstT5ILxtc+8r8UUfj+iEQ==}
 
-  '@vue/compiler-sfc@3.5.42':
-    resolution: {integrity: sha512-fkCAFB4okcAANGMThboWnScp/gzWjU0ZSkVnjTIiplmMDq2uq0tIB3j+xVu4rhv5rvOgBySCysudmbMd6xRRqw==}
+  '@vue/compiler-sfc@3.5.43':
+    resolution: {integrity: sha512-FCbrG3XNCRl+js3huuKx4IVHBLTvMkJhVepjbxSPu1gn4yWLaYtGNQdjJGZaMytXB6qb76qQDDmDSLy/vkmleQ==}
 
-  '@vue/compiler-ssr@3.5.42':
-    resolution: {integrity: sha512-xmLk3wLkbizPAiLyomjgFFosf2ys9b5Ghb+oh/k2tnvipNz8OFrQOiTcWCzyK7MpBp9KkyGtfvgfLUivbmuGYA==}
+  '@vue/compiler-ssr@3.5.43':
+    resolution: {integrity: sha512-GF62orf7KiJX9RqrHNGrYBudsQGD0OhJ5nDs90O8UiDuS40+YMYomiXu6w6EuvtXuRDc3MSNis3EaaSKAVSWpg==}
 
   '@vue/devtools-api@7.7.10':
     resolution: {integrity: sha512-KxtEpUOOpFz/qOGRrAwA36QF7DqIA+FXgCYit9mk9wjbaZt0sXOFz81ElOZtKA4HbWHUdwNjZHBFsFFyp5BZiA==}
@@ -19360,23 +19532,23 @@ packages:
   '@vue/devtools-shared@7.7.10':
     resolution: {integrity: sha512-wOPslzB8vTvpxwdaOcR2qAbwmuSP0L+rhpoC6Cf56V3Jip+HWb7PQQXOUPgBNQARpXsbQX/+mvi8kKucmBGRwQ==}
 
-  '@vue/reactivity@3.5.42':
-    resolution: {integrity: sha512-TzNNfKpb7hDxbQltwAut8VDQA5YP+BuRlxntHUuRjyKwlMvmAPbs3unhCvieijifY6vFfVBwsS7wG/C7uq+bEQ==}
+  '@vue/reactivity@3.5.43':
+    resolution: {integrity: sha512-G/c9GyOZNI2jVaaS6OX1EF1SSFSv7H0ERqNTl4+DTFMlZmB5eVAB53aLQNam/7NL2NPtaDD7RdVrzf8uJzMuOA==}
 
-  '@vue/runtime-core@3.5.42':
-    resolution: {integrity: sha512-9uACtuHs7vJGkm5Bp3xu4xRDLFTIYy5DgxpToVjqGIAhAEKwQfsaLvKINhM6nFVp6bZPRFGdDqd1g52MqKsotA==}
+  '@vue/runtime-core@3.5.43':
+    resolution: {integrity: sha512-hU6U6VnVhBGQDpvlnnDlIB8ZGJBiOcgk2lh/0InltHiz3D8oSkluvuvY+do1G2H3+udeKFsmaBlgVYP7gXQzEw==}
 
-  '@vue/runtime-dom@3.5.42':
-    resolution: {integrity: sha512-rsCmhiWLaRxGltLwhlCWyYkFn7WAbKRh0q17eZ1A6Dq6eqc2ACQ61IIryxz0LrsvCzHSilLA9JHovVwM8CNE2g==}
+  '@vue/runtime-dom@3.5.43':
+    resolution: {integrity: sha512-Bb2Jc0YjjJdMt1SJmb9b2L/IWd3I8lIT9x9eS/xvvP9CiVgna0ffua74xKRmt4/uSJ+0r4iN8ex1jrqkhQGWQw==}
 
-  '@vue/server-renderer@3.5.42':
-    resolution: {integrity: sha512-2++5dUyYS4gvo7xQXSECUDhB7TS0aOl5SeVfC5qSq1Jgfhjvegw1zqhwTIR3imZ+QYPJQw9gfcFvXGAjGZ7ajQ==}
+  '@vue/server-renderer@3.5.43':
+    resolution: {integrity: sha512-l2Ygjv9NehV94PSBxNWsAHC0j/eIIKbn92mBuWXAPGLnn6HfJ6MH5ubsd+Nk0YoZ5FRuxWI1P2VSoh+dbPQhCQ==}
 
   '@vue/shared@3.5.39':
     resolution: {integrity: sha512-l1rrBtBfTnmxvtsvdQDXltUUy8S1Y+ZaqdfUzmAnJkTd8Z8rv5v/ytW+TKiqEOWyHPoqtPlNFSs0lhRmYVSHVA==}
 
-  '@vue/shared@3.5.42':
-    resolution: {integrity: sha512-2rPxex1jQf4jvl9MOHl6YaXCPcrNqz/FstMOEh3QWY+/OME9nQTvl9WYeCwhW7AFjaR0SnngZGlp/wkR6rkI6g==}
+  '@vue/shared@3.5.43':
+    resolution: {integrity: sha512-uksS7YGMR5NZyr4JNq0Rp+QyLns0ueaz20KwzIPW9R0LH1Vnt4E+XUM29PNseEbf1www2gOuhuDi5AKOIXag9Q==}
 
   '@vueuse/core@12.8.2':
     resolution: {integrity: sha512-HbvCmZdzAu3VGi/pWYm5Ut+Kd9mn1ZHnn4L5G8kOQTPs/IwIAmJoBrmYk2ckLArgMXZj0AW3n5CAejLUO+PhdQ==}
@@ -22703,6 +22875,15 @@ packages:
   setprototypeof@1.2.0:
     resolution: {integrity: sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==}
 
+  sharp@0.35.4:
+    resolution: {integrity: sha512-n++8XWcj+jCOr2IOl7h8LbKnGBDY4aPbmprMONBNFdn0ImXqpGVv5zliDs0V9HbmbCQLpbuo2ej9rAoOQTvMDA==}
+    engines: {node: '>=20.9.0'}
+    peerDependencies:
+      '@types/node': '*'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
   sharp@0.35.5:
     resolution: {integrity: sha512-Ywn4OnzGukp7CDMrp08RQ50YKmuwG47brZgIVPTvBaaAfQlRlygrRqSrxdCiL9M+LlzLBiJ68IR1QqvzHyjC7g==}
     engines: {node: '>=20.9.0'}
@@ -22803,6 +22984,10 @@ packages:
   smol-toml@1.9.0:
     resolution: {integrity: sha512-hpd+HLON7HdZXqYchMM/+LaTTbdK0AU3NngIJ4KVyWbY9bfQqdL9cD+4yf6dUoU2Ap4VsU0JkQi6FxAI1B2mXQ==}
     engines: {node: '>= 18'}
+
+  source-map-js@1.2.1:
+    resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
+    engines: {node: '>=0.10.0'}
 
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
@@ -23474,8 +23659,8 @@ packages:
   vscode-languageserver-types@3.18.0:
     resolution: {integrity: sha512-8TsGPNMIMiiBdkORgRSvLjuiEIiAFtO+KssmYWxQ+uSVvlf7RjK8YKCOjPzZ+YA04jXEV7+7LvkSmHkhpNS99g==}
 
-  vue@3.5.42:
-    resolution: {integrity: sha512-4RyHQTbQvOPs3MfvUO1Sg0YRrKNnA0mAVtvpd12Tg1fKDN7OHBUl1IqSn8zGJjK9nI3NkNp8cgTpVrSZC5TTcA==}
+  vue@3.5.43:
+    resolution: {integrity: sha512-o5qZoksdnjIKvW1srZ3ab7pcDNYAerBjRe54D0LBLfRdCYFrSgBHVXokMas35czQc0//lmx4/tuY4ZNQ+Rf2Ng==}
     peerDependencies:
       typescript: '*'
     peerDependenciesMeta:
@@ -23922,7 +24107,7 @@ snapshots:
       '@aws-sdk/xml-builder': 3.972.41
       '@aws/lambda-invoke-store': 0.3.0
       '@smithy/core': 3.35.0
-      '@smithy/signature-v4': 5.7.4
+      '@smithy/signature-v4': 5.7.3
       '@smithy/types': 4.19.0
       bowser: 2.14.1
       tslib: 2.8.1
@@ -24049,7 +24234,7 @@ snapshots:
   '@aws-sdk/signature-v4-multi-region@3.996.47':
     dependencies:
       '@aws-sdk/types': 3.974.6
-      '@smithy/signature-v4': 5.7.4
+      '@smithy/signature-v4': 5.7.3
       '@smithy/types': 4.19.0
       tslib: 2.8.1
 
@@ -24932,9 +25117,19 @@ snapshots:
 
   '@img/colour@1.1.0': {}
 
+  '@img/sharp-darwin-arm64@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-darwin-arm64': 1.3.3
+    optional: true
+
   '@img/sharp-darwin-arm64@0.35.5':
     optionalDependencies:
       '@img/sharp-libvips-darwin-arm64': 1.3.4
+    optional: true
+
+  '@img/sharp-darwin-x64@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-darwin-x64': 1.3.3
     optional: true
 
   '@img/sharp-darwin-x64@0.35.5':
@@ -24942,39 +25137,79 @@ snapshots:
       '@img/sharp-libvips-darwin-x64': 1.3.4
     optional: true
 
+  '@img/sharp-freebsd-wasm32@0.35.4':
+    dependencies:
+      '@img/sharp-wasm32': 0.35.4
+    optional: true
+
   '@img/sharp-freebsd-wasm32@0.35.5':
     dependencies:
       '@img/sharp-wasm32': 0.35.5
     optional: true
 
+  '@img/sharp-libvips-darwin-arm64@1.3.3':
+    optional: true
+
   '@img/sharp-libvips-darwin-arm64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-darwin-x64@1.3.3':
     optional: true
 
   '@img/sharp-libvips-darwin-x64@1.3.4':
     optional: true
 
+  '@img/sharp-libvips-linux-arm64@1.3.3':
+    optional: true
+
   '@img/sharp-libvips-linux-arm64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linux-arm@1.3.3':
     optional: true
 
   '@img/sharp-libvips-linux-arm@1.3.4':
     optional: true
 
+  '@img/sharp-libvips-linux-ppc64@1.3.3':
+    optional: true
+
   '@img/sharp-libvips-linux-ppc64@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linux-riscv64@1.3.3':
     optional: true
 
   '@img/sharp-libvips-linux-riscv64@1.3.4':
     optional: true
 
+  '@img/sharp-libvips-linux-s390x@1.3.3':
+    optional: true
+
   '@img/sharp-libvips-linux-s390x@1.3.4':
+    optional: true
+
+  '@img/sharp-libvips-linux-x64@1.3.3':
     optional: true
 
   '@img/sharp-libvips-linux-x64@1.3.4':
     optional: true
 
+  '@img/sharp-libvips-linuxmusl-arm64@1.3.3':
+    optional: true
+
   '@img/sharp-libvips-linuxmusl-arm64@1.3.4':
     optional: true
 
+  '@img/sharp-libvips-linuxmusl-x64@1.3.3':
+    optional: true
+
   '@img/sharp-libvips-linuxmusl-x64@1.3.4':
+    optional: true
+
+  '@img/sharp-linux-arm64@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-arm64': 1.3.3
     optional: true
 
   '@img/sharp-linux-arm64@0.35.5':
@@ -24982,9 +25217,19 @@ snapshots:
       '@img/sharp-libvips-linux-arm64': 1.3.4
     optional: true
 
+  '@img/sharp-linux-arm@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-arm': 1.3.3
+    optional: true
+
   '@img/sharp-linux-arm@0.35.5':
     optionalDependencies:
       '@img/sharp-libvips-linux-arm': 1.3.4
+    optional: true
+
+  '@img/sharp-linux-ppc64@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-ppc64': 1.3.3
     optional: true
 
   '@img/sharp-linux-ppc64@0.35.5':
@@ -24992,9 +25237,19 @@ snapshots:
       '@img/sharp-libvips-linux-ppc64': 1.3.4
     optional: true
 
+  '@img/sharp-linux-riscv64@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-riscv64': 1.3.3
+    optional: true
+
   '@img/sharp-linux-riscv64@0.35.5':
     optionalDependencies:
       '@img/sharp-libvips-linux-riscv64': 1.3.4
+    optional: true
+
+  '@img/sharp-linux-s390x@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-s390x': 1.3.3
     optional: true
 
   '@img/sharp-linux-s390x@0.35.5':
@@ -25002,9 +25257,19 @@ snapshots:
       '@img/sharp-libvips-linux-s390x': 1.3.4
     optional: true
 
+  '@img/sharp-linux-x64@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-linux-x64': 1.3.3
+    optional: true
+
   '@img/sharp-linux-x64@0.35.5':
     optionalDependencies:
       '@img/sharp-libvips-linux-x64': 1.3.4
+    optional: true
+
+  '@img/sharp-linuxmusl-arm64@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-linuxmusl-arm64': 1.3.3
     optional: true
 
   '@img/sharp-linuxmusl-arm64@0.35.5':
@@ -25012,9 +25277,19 @@ snapshots:
       '@img/sharp-libvips-linuxmusl-arm64': 1.3.4
     optional: true
 
+  '@img/sharp-linuxmusl-x64@0.35.4':
+    optionalDependencies:
+      '@img/sharp-libvips-linuxmusl-x64': 1.3.3
+    optional: true
+
   '@img/sharp-linuxmusl-x64@0.35.5':
     optionalDependencies:
       '@img/sharp-libvips-linuxmusl-x64': 1.3.4
+    optional: true
+
+  '@img/sharp-wasm32@0.35.4':
+    dependencies:
+      '@emnapi/runtime': 1.11.3
     optional: true
 
   '@img/sharp-wasm32@0.35.5':
@@ -25022,15 +25297,29 @@ snapshots:
       '@emnapi/runtime': 1.11.3
     optional: true
 
+  '@img/sharp-webcontainers-wasm32@0.35.4':
+    dependencies:
+      '@img/sharp-wasm32': 0.35.4
+    optional: true
+
   '@img/sharp-webcontainers-wasm32@0.35.5':
     dependencies:
       '@img/sharp-wasm32': 0.35.5
     optional: true
 
+  '@img/sharp-win32-arm64@0.35.4':
+    optional: true
+
   '@img/sharp-win32-arm64@0.35.5':
     optional: true
 
+  '@img/sharp-win32-ia32@0.35.4':
+    optional: true
+
   '@img/sharp-win32-ia32@0.35.5':
+    optional: true
+
+  '@img/sharp-win32-x64@0.35.4':
     optional: true
 
   '@img/sharp-win32-x64@0.35.5':
@@ -25962,6 +26251,11 @@ snapshots:
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
+  '@smithy/core@3.34.1':
+    dependencies:
+      '@smithy/types': 4.18.0
+      tslib: 2.8.1
+
   '@smithy/core@3.35.0':
     dependencies:
       '@smithy/types': 4.19.0
@@ -25969,14 +26263,14 @@ snapshots:
 
   '@smithy/credential-provider-imds@4.5.2':
     dependencies:
-      '@smithy/core': 3.35.0
-      '@smithy/types': 4.19.0
+      '@smithy/core': 3.34.1
+      '@smithy/types': 4.18.0
       tslib: 2.8.1
 
   '@smithy/fetch-http-handler@5.8.0':
     dependencies:
-      '@smithy/core': 3.35.0
-      '@smithy/types': 4.19.0
+      '@smithy/core': 3.34.1
+      '@smithy/types': 4.18.0
       tslib: 2.8.1
 
   '@smithy/node-http-handler@4.12.1':
@@ -25985,10 +26279,20 @@ snapshots:
       '@smithy/types': 4.19.0
       tslib: 2.8.1
 
+  '@smithy/signature-v4@5.7.3':
+    dependencies:
+      '@smithy/core': 3.34.1
+      '@smithy/types': 4.18.0
+      tslib: 2.8.1
+
   '@smithy/signature-v4@5.7.4':
     dependencies:
       '@smithy/core': 3.35.0
       '@smithy/types': 4.19.0
+      tslib: 2.8.1
+
+  '@smithy/types@4.18.0':
+    dependencies:
       tslib: 2.8.1
 
   '@smithy/types@4.19.0':
@@ -26484,10 +26788,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@vitejs/plugin-vue@5.2.4(vite@5.4.21(@types/node@22.20.1)(lightningcss@1.33.0))(vue@3.5.42(typescript@6.0.3))':
+  '@vitejs/plugin-vue@5.2.4(vite@5.4.21(@types/node@22.20.1)(lightningcss@1.33.0))(vue@3.5.43(typescript@6.0.3))':
     dependencies:
       vite: 5.4.21(@types/node@22.20.1)(lightningcss@1.33.0)
-      vue: 3.5.42(typescript@6.0.3)
+      vue: 3.5.43(typescript@6.0.3)
 
   '@vitest/coverage-v8@4.1.11(vitest@4.1.11)':
     dependencies:
@@ -26603,35 +26907,35 @@ snapshots:
       '@vscode/ripgrep-win32-ia32': 1.18.0
       '@vscode/ripgrep-win32-x64': 1.18.0
 
-  '@vue/compiler-core@3.5.42':
+  '@vue/compiler-core@3.5.43':
     dependencies:
       '@babel/parser': 7.29.8
-      '@vue/shared': 3.5.42
+      '@vue/shared': 3.5.43
       entities: 7.0.1
       estree-walker: 2.0.2
-      source-map-js: 1.2.2
+      source-map-js: 1.2.1
 
-  '@vue/compiler-dom@3.5.42':
+  '@vue/compiler-dom@3.5.43':
     dependencies:
-      '@vue/compiler-core': 3.5.42
-      '@vue/shared': 3.5.42
+      '@vue/compiler-core': 3.5.43
+      '@vue/shared': 3.5.43
 
-  '@vue/compiler-sfc@3.5.42':
+  '@vue/compiler-sfc@3.5.43':
     dependencies:
       '@babel/parser': 7.29.8
-      '@vue/compiler-core': 3.5.42
-      '@vue/compiler-dom': 3.5.42
-      '@vue/compiler-ssr': 3.5.42
-      '@vue/shared': 3.5.42
+      '@vue/compiler-core': 3.5.43
+      '@vue/compiler-dom': 3.5.43
+      '@vue/compiler-ssr': 3.5.43
+      '@vue/shared': 3.5.43
       estree-walker: 2.0.2
       magic-string: 0.30.21
       postcss: 8.5.28
-      source-map-js: 1.2.2
+      source-map-js: 1.2.1
 
-  '@vue/compiler-ssr@3.5.42':
+  '@vue/compiler-ssr@3.5.43':
     dependencies:
-      '@vue/compiler-dom': 3.5.42
-      '@vue/shared': 3.5.42
+      '@vue/compiler-dom': 3.5.43
+      '@vue/shared': 3.5.43
 
   '@vue/devtools-api@7.7.10':
     dependencies:
@@ -26651,38 +26955,38 @@ snapshots:
     dependencies:
       rfdc: 1.4.1
 
-  '@vue/reactivity@3.5.42':
+  '@vue/reactivity@3.5.43':
     dependencies:
-      '@vue/shared': 3.5.42
+      '@vue/shared': 3.5.43
 
-  '@vue/runtime-core@3.5.42':
+  '@vue/runtime-core@3.5.43':
     dependencies:
-      '@vue/reactivity': 3.5.42
-      '@vue/shared': 3.5.42
+      '@vue/reactivity': 3.5.43
+      '@vue/shared': 3.5.43
 
-  '@vue/runtime-dom@3.5.42':
+  '@vue/runtime-dom@3.5.43':
     dependencies:
-      '@vue/reactivity': 3.5.42
-      '@vue/runtime-core': 3.5.42
-      '@vue/shared': 3.5.42
+      '@vue/reactivity': 3.5.43
+      '@vue/runtime-core': 3.5.43
+      '@vue/shared': 3.5.43
       csstype: 3.2.3
 
-  '@vue/server-renderer@3.5.42':
+  '@vue/server-renderer@3.5.43':
     dependencies:
-      '@vue/compiler-ssr': 3.5.42
-      '@vue/runtime-dom': 3.5.42
-      '@vue/shared': 3.5.42
+      '@vue/compiler-ssr': 3.5.43
+      '@vue/runtime-dom': 3.5.43
+      '@vue/shared': 3.5.43
 
   '@vue/shared@3.5.39': {}
 
-  '@vue/shared@3.5.42': {}
+  '@vue/shared@3.5.43': {}
 
   '@vueuse/core@12.8.2(typescript@6.0.3)':
     dependencies:
       '@types/web-bluetooth': 0.0.21
       '@vueuse/metadata': 12.8.2
       '@vueuse/shared': 12.8.2(typescript@6.0.3)
-      vue: 3.5.42(typescript@6.0.3)
+      vue: 3.5.43(typescript@6.0.3)
     transitivePeerDependencies:
       - typescript
 
@@ -26690,7 +26994,7 @@ snapshots:
     dependencies:
       '@vueuse/core': 12.8.2(typescript@6.0.3)
       '@vueuse/shared': 12.8.2(typescript@6.0.3)
-      vue: 3.5.42(typescript@6.0.3)
+      vue: 3.5.43(typescript@6.0.3)
     optionalDependencies:
       focus-trap: 7.8.0
     transitivePeerDependencies:
@@ -26700,7 +27004,7 @@ snapshots:
 
   '@vueuse/shared@12.8.2(typescript@6.0.3)':
     dependencies:
-      vue: 3.5.42(typescript@6.0.3)
+      vue: 3.5.43(typescript@6.0.3)
     transitivePeerDependencies:
       - typescript
 
@@ -30039,7 +30343,7 @@ snapshots:
     dependencies:
       nanoid: 3.3.18
       picocolors: 1.1.1
-      source-map-js: 1.2.2
+      source-map-js: 1.2.1
 
   postject@1.0.0-alpha.6:
     dependencies:
@@ -30498,6 +30802,39 @@ snapshots:
 
   setprototypeof@1.2.0: {}
 
+  sharp@0.35.4(@types/node@22.20.1):
+    dependencies:
+      '@img/colour': 1.1.0
+      detect-libc: 2.1.2
+      semver: 7.8.5
+    optionalDependencies:
+      '@img/sharp-darwin-arm64': 0.35.4
+      '@img/sharp-darwin-x64': 0.35.4
+      '@img/sharp-freebsd-wasm32': 0.35.4
+      '@img/sharp-libvips-darwin-arm64': 1.3.3
+      '@img/sharp-libvips-darwin-x64': 1.3.3
+      '@img/sharp-libvips-linux-arm': 1.3.3
+      '@img/sharp-libvips-linux-arm64': 1.3.3
+      '@img/sharp-libvips-linux-ppc64': 1.3.3
+      '@img/sharp-libvips-linux-riscv64': 1.3.3
+      '@img/sharp-libvips-linux-s390x': 1.3.3
+      '@img/sharp-libvips-linux-x64': 1.3.3
+      '@img/sharp-libvips-linuxmusl-arm64': 1.3.3
+      '@img/sharp-libvips-linuxmusl-x64': 1.3.3
+      '@img/sharp-linux-arm': 0.35.4
+      '@img/sharp-linux-arm64': 0.35.4
+      '@img/sharp-linux-ppc64': 0.35.4
+      '@img/sharp-linux-riscv64': 0.35.4
+      '@img/sharp-linux-s390x': 0.35.4
+      '@img/sharp-linux-x64': 0.35.4
+      '@img/sharp-linuxmusl-arm64': 0.35.4
+      '@img/sharp-linuxmusl-x64': 0.35.4
+      '@img/sharp-webcontainers-wasm32': 0.35.4
+      '@img/sharp-win32-arm64': 0.35.4
+      '@img/sharp-win32-ia32': 0.35.4
+      '@img/sharp-win32-x64': 0.35.4
+      '@types/node': 22.20.1
+
   sharp@0.35.5(@types/node@22.20.1):
     dependencies:
       '@img/colour': 1.1.0
@@ -30635,6 +30972,8 @@ snapshots:
       semver: 7.8.5
 
   smol-toml@1.9.0: {}
+
+  source-map-js@1.2.1: {}
 
   source-map-js@1.2.2: {}
 
@@ -31195,7 +31534,7 @@ snapshots:
       '@shikijs/transformers': 2.5.0
       '@shikijs/types': 2.5.0
       '@types/markdown-it': 14.1.2
-      '@vitejs/plugin-vue': 5.2.4(vite@5.4.21(@types/node@22.20.1)(lightningcss@1.33.0))(vue@3.5.42(typescript@6.0.3))
+      '@vitejs/plugin-vue': 5.2.4(vite@5.4.21(@types/node@22.20.1)(lightningcss@1.33.0))(vue@3.5.43(typescript@6.0.3))
       '@vue/devtools-api': 7.7.10
       '@vue/shared': 3.5.39
       '@vueuse/core': 12.8.2(typescript@6.0.3)
@@ -31205,7 +31544,7 @@ snapshots:
       minisearch: 7.2.0
       shiki: 2.5.0
       vite: 5.4.21(@types/node@22.20.1)(lightningcss@1.33.0)
-      vue: 3.5.42(typescript@6.0.3)
+      vue: 3.5.43(typescript@6.0.3)
     optionalDependencies:
       postcss: 8.5.28
     transitivePeerDependencies:
@@ -31309,13 +31648,13 @@ snapshots:
 
   vscode-languageserver-types@3.18.0: {}
 
-  vue@3.5.42(typescript@6.0.3):
+  vue@3.5.43(typescript@6.0.3):
     dependencies:
-      '@vue/compiler-dom': 3.5.42
-      '@vue/compiler-sfc': 3.5.42
-      '@vue/runtime-dom': 3.5.42
-      '@vue/server-renderer': 3.5.42
-      '@vue/shared': 3.5.42
+      '@vue/compiler-dom': 3.5.43
+      '@vue/compiler-sfc': 3.5.43
+      '@vue/runtime-dom': 3.5.43
+      '@vue/server-renderer': 3.5.43
+      '@vue/shared': 3.5.43
     optionalDependencies:
       typescript: 6.0.3
 
