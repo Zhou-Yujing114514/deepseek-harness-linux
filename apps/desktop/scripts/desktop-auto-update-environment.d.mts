@@ -7,8 +7,14 @@ export type DesktopAutoUpdateEnvironment = 'test' | 'production' | 'selfhosted'
 /** Update channel embedded in the installer. */
 export type DesktopAutoUpdateChannel = 'nightly' | 'latest'
 
-/** Directory name of one supported Desktop release target. */
-export type DesktopAutoUpdateTarget = 'mac-arm64' | 'mac-x64' | 'win-x64' | 'linux-x64' | 'linux-arm64'
+/** Directory name of one officially supported Desktop release target. */
+export type DesktopAutoUpdateTarget = 'mac-arm64' | 'mac-x64' | 'win-x64'
+
+/** Directory name of a Linux release target, published by this fork's self-hosted deployment. */
+export type DesktopLinuxUpdateTarget = 'linux-x64' | 'linux-arm64'
+
+/** Every Desktop release target this fork can package, Linux included. */
+export type DesktopUpdateTarget = DesktopAutoUpdateTarget | DesktopLinuxUpdateTarget
 
 /** Public updater URL and object prefixes for one release target. */
 export interface DesktopAutoUpdateConfig {
