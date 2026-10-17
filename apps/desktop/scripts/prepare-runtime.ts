@@ -61,8 +61,10 @@ async function prepareElectron({ platform, arch }: DesktopTarget): Promise<strin
     () => downloadElectron(version, platform, arch))
   rmSync(BUILD_PATHS.electron, { recursive: true, force: true })
   await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'extract:electron', () => extractZip(archive, { dir: BUILD_PATHS.electron }))
-  const executable = join(BUILD_PATHS.electron, platform === 'win32' ? 'electron.exe'
-    : platform === 'linux' ? 'electron' : 'Electron.app/Contents/MacOS/Electron')
+  // This fork adds Linux targets; the official target type only models macOS and Windows.
+  const host = platform as 'darwin' | 'linux' | 'win32'
+  const executable = join(BUILD_PATHS.electron, host === 'win32' ? 'electron.exe'
+    : host === 'linux' ? 'electron' : 'Electron.app/Contents/MacOS/Electron')
   return execFileSync(executable, ['-p', 'process.versions.node'], {
     encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
   }).trim()
