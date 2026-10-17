@@ -36,9 +36,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  # A sync almost always touches upstream's own workflow files, and pushing changes under
-  # .github/workflows/ needs this scope — without it the push is rejected outright.
-  workflows: write
 
 concurrency:
   group: sync-upstream
@@ -68,7 +65,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # The default GITHUB_TOKEN is not allowed to touch .github/workflows/, and a sync
+          # nearly always changes upstream workflow files. SYNC_TOKEN is a PAT carrying the
+          # workflow scope; fall back to the built-in token when it is absent.
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
 
       - name: Fetch the official upstream
         id: upstream
