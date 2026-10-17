@@ -71,7 +71,7 @@ jobs:
           SOURCE_COMMIT: ${{ needs.validate.outputs.commit }}
         run: pnpm exec tsx scripts/ssh-helper/release.ts --directory=dist-exe/ssh-helper --version="$RELEASE_VERSION" --commit="$SOURCE_COMMIT"
       - name: Upload verified release checksums
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: ssh-helper-release-checksums
           path: dist-exe/ssh-helper/SHA256SUMS
