@@ -1,0 +1,204 @@
+# Keep this fork aligned with the official DeepSeek Harness repository.
+#
+# Upstream ships macOS and Windows desktop builds only; this repository adds first-class
+# Linux packaging on top of it. Upstream moves very fast (hundreds of commits per week),
+# so reconciling by hand is not realistic. This workflow does it on GitHub's own runners,
+# where fetching upstream is cheap and reliable.
+#
+# What one run does:
+#   1. Fetch the official ref and measure how far behind we are.
+#   2. Merge it into a fresh sync branch.
+#   3. Resolve the conflicts that are predictable in a packaging fork:
+#        - paths this fork owns (Linux packaging, Linux CI, READMEs) -> keep ours
+#        - everything else (upstream source, dependency and version bumps) -> take upstream
+#   4. Push that branch and open a pull request summarising what came from where.
+#
+# Nothing is written to master automatically: a human or a follow-up review decides.
+
+name: Sync upstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream-ref:
+        description: Upstream branch or tag to sync from.
+        required: false
+        default: master
+      open-pr:
+        description: Open a pull request with the merged result.
+        required: false
+        type: boolean
+        default: true
+  schedule:
+    # 02:17 UTC, daily.
+    - cron: '17 2 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+env:
+  # Paths this fork owns. Upstream touches some of them too (desktop packaging exists
+  # upstream as well), but on conflict we keep our side: Linux packaging is the entire
+  # reason this repository exists. Everything outside this list follows upstream.
+  OURS_PATHS: |
+    apps/desktop/scripts/
+    apps/desktop/.env.linux.example
+    apps/desktop/README.md
+    apps/desktop/package.json
+    .github/workflows/desktop-linux.yml
+    .github/workflows/release-attach.yml
+    .github/actions/prepare-linux-env/
+    .github/actions/smoke-linux-appimage/
+    README.md
+    README.zh.md
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out our repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch the official upstream
+        id: upstream
+        run: |
+          set -euo pipefail
+          REF="${{ inputs.upstream-ref || 'master' }}"
+          git remote add upstream https://github.com/deepseek-ai/deepseek-harness.git 2>/dev/null || true
+          git fetch upstream "${REF}:refs/remotes/upstream-sync" --no-tags --force
+          SHA="$(git rev-parse refs/remotes/upstream-sync)"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+          echo "Fetched upstream ${REF} at ${SHA}"
+
+      - name: Measure the gap
+        id: gap
+        run: |
+          set -euo pipefail
+          SHA="${{ steps.upstream.outputs.sha }}"
+          BASE="$(git merge-base HEAD "${SHA}")"
+          BEHIND="$(git rev-list --count "${BASE}..${SHA}")"
+          AHEAD="$(git rev-list --count "${SHA}..HEAD")"
+          echo "behind=${BEHIND}" >> "$GITHUB_OUTPUT"
+          echo "ahead=${AHEAD}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Sync summary"
+            echo ""
+            echo "- upstream ref: \`${{ steps.upstream.outputs.ref }}\` (\`${SHA:0:12}\`)"
+            echo "- merge base: \`${BASE:0:12}\`"
+            echo "- commits behind upstream: **${BEHIND}**"
+            echo "- our commits on top: **${AHEAD}**"
+          } > summary.md
+
+      - name: Stop when already current
+        if: steps.gap.outputs.behind == '0'
+        run: |
+          echo "Already up to date with upstream; nothing to do."
+          exit 0
+
+      - name: Merge upstream and resolve conflicts
+        id: merge
+        run: |
+          set -uo pipefail
+          SHA="${{ steps.upstream.outputs.sha }}"
+          BRANCH="sync/upstream-$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+
+          git merge --no-edit "${SHA}" >/dev/null 2>&1 || echo "merge reported conflicts"
+
+          UNMERGED="$(git diff --name-only --diff-filter=U || true)"
+
+          if [ -z "${UNMERGED}" ]; then
+            echo "outcome=clean" >> "$GITHUB_OUTPUT"
+            echo "### Conflict resolution" > resolved.md
+            echo "" >> resolved.md
+            echo "Merged cleanly — no conflicts." >> resolved.md
+          else
+            echo "outcome=conflicts" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Conflict resolution"
+              echo ""
+              echo "| file | kept |"
+              echo "| --- | --- |"
+            } > resolved.md
+
+            while IFS= read -r f; do
+              [ -z "${f}" ] && continue
+              keep=theirs
+              while IFS= read -r p; do
+                [ -z "${p}" ] && continue
+                case "${f}" in
+                  "${p}"*) keep=ours; break;;
+                esac
+              done <<< "${OURS_PATHS}"
+
+              if [ "${keep}" = "ours" ]; then
+                git checkout --ours -- "${f}" 2>/dev/null || true
+              else
+                git checkout --theirs -- "${f}" 2>/dev/null || true
+              fi
+              git add -- "${f}" 2>/dev/null || true
+              echo "| \`${f}\` | ${keep} |" >> resolved.md
+            done <<< "${UNMERGED}"
+
+            # Anything still unresolved after the pass above (added/deleted combinations)
+            # falls back to upstream so the run never leaves the tree in a conflicted state.
+            STILL="$(git diff --name-only --diff-filter=U || true)"
+            if [ -n "${STILL}" ]; then
+              while IFS= read -r f; do
+                [ -z "${f}" ] && continue
+                git checkout --theirs -- "${f}" 2>/dev/null || true
+                git add -- "${f}" 2>/dev/null || true
+                echo "| \`${f}\` | theirs (fallback) |" >> resolved.md
+              done <<< "${STILL}"
+            fi
+
+            if git diff --cached --quiet 2>/dev/null; then
+              git commit --no-edit -m "Merge upstream ${SHA:0:12}" >/dev/null 2>&1 || true
+            else
+              git commit --no-edit >/dev/null 2>&1 || git commit -m "Merge upstream ${SHA:0:12}" >/dev/null 2>&1 || true
+            fi
+          fi
+
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+          {
+            cat summary.md
+            echo ""
+            cat resolved.md
+            echo ""
+            echo "> Review the **kept = ours** rows carefully: those files keep this fork's "
+            echo "> Linux packaging behaviour and may need manual reconciliation against upstream."
+          } > pr-body.md
+          cat pr-body.md
+
+      - name: Push the sync branch
+        run: |
+          set -euo pipefail
+          git push origin "${{ steps.merge.outputs.branch }}"
+
+      - name: Open a pull request
+        if: ${{ inputs.open-pr != false }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          EXISTING="$(gh pr list --head "${{ steps.merge.outputs.branch }}" --json number --jq '.[0].number' || true)"
+          if [ -n "${EXISTING}" ]; then
+            echo "Pull request #${EXISTING} already exists for this branch."
+            exit 0
+          fi
+          gh pr create \
+            --base master \
+            --head "${{ steps.merge.outputs.branch }}" \
+            --title "chore: sync with upstream deepseek-ai/deepseek-harness (${{ steps.gap.outputs.behind }} commits)" \
+            --body-file pr-body.md
