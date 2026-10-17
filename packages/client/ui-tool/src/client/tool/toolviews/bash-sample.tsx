@@ -3,20 +3,23 @@ import type { Context } from '@deepseek-ai/cordis'
 import clsx from 'clsx'
 import {
   IconApiOutlineRegular, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular, IconInspectOutlineRegular,
-  TerminalBlock, TextShimmer,
+  CommandText, TerminalBlock, TextShimmer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
 import {
+  isBackgroundShellCall,
   isSettledPersistentShellCall,
   isSpilledShellCall,
   localizeTerminalCardModel,
   terminalBlockLabels,
   terminalCardModel,
   terminalFailed,
+  terminalExitLabel,
 } from '../models/terminal-card-model.ts'
 import { formatToolBody, toolRowModel, type ToolRowState } from '../models/tool-call-model.ts'
 import { CONVERSATION_NS as NS } from '../../locale.ts'
+import { ExitCodeBadge } from '../components/ExitCodeBadge.tsx'
 import css from './bash-sample.module.css'
 
 type BashRowProps = ToolCallViewProps & PropsLocale<'conversation'>
@@ -48,17 +51,17 @@ export const BashRow = memo(function BashRow({ toolName, block, sessionId, useSe
   const terminalModel = useMemo(() => terminalCardModel(block, cwd), [block, cwd])
   const terminal = useMemo(() => terminalModel === null ? null : localizeTerminalCardModel(terminalModel, t), [terminalModel, t])
   const labels = useMemo(() => terminalBlockLabels(t), [t])
-  // A failing exit status is the terminal card's own error signal (the call
-  // itself settles isError:false), surfaced through the row's error summary.
+  // Exit failures are result data even when the tool call itself succeeds.
   const state = model.state === 'ok' && terminalModel !== null && terminalFailed(terminalModel)
     ? 'error'
     : model.state
   const status = stateStatus(state, t)
   const { expanded, toggle: toggleExpand } = useDisclosure()
-  // Failures, persistent-shell results, and spill previews use a generic body;
-  // background acknowledgements and malformed calls remain collapsed.
+  const background = isBackgroundShellCall(block)
+  // Failed or interrupted background launches retain raw input/output, as do
+  // other execution failures, persistent results, and spill previews.
   const genericBody = terminal === null
-    && (model.state === 'error' || isSettledPersistentShellCall(block) || isSpilledShellCall(block))
+    && (model.state === 'error' || isSettledPersistentShellCall(block) || isSpilledShellCall(block) || background)
     && (model.bodyRaw !== null || model.output !== null)
   const expandable = terminal !== null || genericBody
   const open = expanded && expandable
@@ -69,7 +72,8 @@ export const BashRow = memo(function BashRow({ toolName, block, sessionId, useSe
     [genericBody, model.bodyRaw, model.variant, open],
   )
   const normalSummary = terminal?.description ?? model.summary
-  const settlementLine = state === 'error'
+  const exitLabel = terminalExitLabel(terminalModel, t)
+  const settlementLine = exitLabel !== null ? null : state === 'error'
     ? model.errorSummary ?? normalSummary
     : state === 'stopped' ? t('bash.stopped') : null
   const running = state === 'running' || state === 'preparing'
@@ -109,11 +113,12 @@ export const BashRow = memo(function BashRow({ toolName, block, sessionId, useSe
           <span className={css.sep} data-shimmer-decoration aria-hidden />
           <span className={clsx(
             css.summary,
-            state === 'error' && css.errorSummary,
-            state === 'stopped' && css.stoppedSummary,
+            exitLabel === null && state === 'error' && css.errorSummary,
+            exitLabel === null && state === 'stopped' && css.stoppedSummary,
           )}>
             <TextShimmer>{settlementLine ?? normalSummary}</TextShimmer>
           </span>
+          {exitLabel !== null && <ExitCodeBadge label={exitLabel} />}
         </TextShimmer>
       </div>
       {open && (
@@ -132,7 +137,9 @@ export const BashRow = memo(function BashRow({ toolName, block, sessionId, useSe
                 {body !== null && (
                   <div className={css.ioSection}>
                     <span className={css.ioLabel}>{t('row.input')}</span>
-                    <span className={css.ioText}>{body}</span>
+                    {background
+                      ? <CommandText className={css.commandInput} text={body} label={t('row.commandArguments')} />
+                      : <span className={css.ioText}>{body}</span>}
                   </div>
                 )}
                 {body !== null && model.output !== null && (

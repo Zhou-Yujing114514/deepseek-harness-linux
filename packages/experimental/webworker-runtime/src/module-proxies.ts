@@ -59,6 +59,7 @@ export const MODULE_PROXIES: Record<string, string> = {
   // the VFS, because a browser worker has no processes to fork.
   'node:child_process': './node/builtin_modules/implemented/child_process.ts',
   // Structural mocks: every symbol exists, every call throws.
+  'node:https': './node/builtin_modules/mock/https.ts',
   'node:dns/promises': './node/builtin_modules/mock/dns/promises.ts',
   'dns/promises': './node/builtin_modules/mock/dns/promises.ts',
   'node:net': './node/builtin_modules/mock/net.ts',
@@ -78,6 +79,8 @@ export const MODULE_PROXIES: Record<string, string> = {
   'got': './node/external_packages/got.ts',
   '@vscode/ripgrep': './node/external_packages/ripgrep.ts',
   '@earendil-works/pi-ai': './node/external_packages/pi-ai.ts',
+  // Node internal modules for callers without `--expose-internals`.
+  'node-addon-require-builtin': './node/external_packages/node-addon-require-builtin.ts',
   // Constructible fakes whose methods are never reached.
   'ws': './node/external_packages/ws.ts',
 }
