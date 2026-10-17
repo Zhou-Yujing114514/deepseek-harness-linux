@@ -20,7 +20,7 @@ export type DesktopUpdateTarget = DesktopAutoUpdateTarget | DesktopLinuxUpdateTa
 export interface DesktopAutoUpdateConfig {
   readonly environment: DesktopAutoUpdateEnvironment
   readonly channel: DesktopAutoUpdateChannel
-  readonly target: DesktopAutoUpdateTarget
+  readonly target: DesktopUpdateTarget
   readonly origin: string
   readonly publicUrl: string
   readonly keyPrefix: string
@@ -56,17 +56,17 @@ export function resolveDesktopAutoUpdateEnvironment(
  * @param arch - Target Node.js architecture.
  * @returns Update target directory.
  */
-export function resolveDesktopAutoUpdateTarget(
+export function resolveDesktopUpdateTarget(
   platform: NodeJS.Platform,
   arch: string,
-): DesktopAutoUpdateTarget
+): DesktopUpdateTarget
 
 /**
  * Return the local completion record filename for one packaged target.
  * @param target - Supported release target.
  * @returns Filename stored beside electron-builder artifacts.
  */
-export function desktopBuildRecordFilename(target: DesktopAutoUpdateTarget): string
+export function desktopBuildRecordFilename(target: DesktopUpdateTarget): string
 
 /**
  * Return the electron-builder channel metadata filename for an application version.
