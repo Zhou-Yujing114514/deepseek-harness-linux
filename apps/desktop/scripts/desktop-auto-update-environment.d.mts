@@ -4,12 +4,16 @@ export const DESKTOP_AUTO_UPDATE_ENV: 'DSH_DESKTOP_AUTO_UPDATE_ENV'
 /** Supported Desktop update deployment. */
 export type DesktopAutoUpdateEnvironment = 'test' | 'production' | 'selfhosted'
 
+/** Update channel embedded in the installer. */
+export type DesktopAutoUpdateChannel = 'nightly' | 'latest'
+
 /** Directory name of one supported Desktop release target. */
 export type DesktopAutoUpdateTarget = 'mac-arm64' | 'mac-x64' | 'win-x64' | 'linux-x64' | 'linux-arm64'
 
 /** Public updater URL and object prefixes for one release target. */
 export interface DesktopAutoUpdateConfig {
   readonly environment: DesktopAutoUpdateEnvironment
+  readonly channel: DesktopAutoUpdateChannel
   readonly target: DesktopAutoUpdateTarget
   readonly origin: string
   readonly publicUrl: string
@@ -23,6 +27,13 @@ export interface DesktopUploadConfig extends DesktopAutoUpdateConfig {
   readonly secretIdEnvName: string
   readonly secretKeyEnvName: string
 }
+
+/**
+ * Resolve the channel embedded in the installer; omitted local settings retain nightly.
+ * @param env - Packaging or upload settings.
+ * @returns Validated channel.
+ */
+export function resolveDesktopUpdateChannel(env: NodeJS.ProcessEnv): DesktopAutoUpdateChannel
 
 /**
  * Resolve the update deployment, defaulting local release work to test.
@@ -55,12 +66,14 @@ export function desktopBuildRecordFilename(target: DesktopAutoUpdateTarget): str
  * Return the electron-builder channel metadata filename for an application version.
  * @param version - Desktop semantic version.
  * @param platform - Target platform.
+ * @param channel - Selected channel; omitted means nightly.
  * @param arch - Target architecture; Linux manifests are suffixed unless it is x64.
  * @returns Channel metadata filename emitted for the target.
  */
 export function desktopUpdateMetadataFilename(
   version: string,
   platform: NodeJS.Platform,
+  channel?: DesktopAutoUpdateChannel,
   arch?: string,
 ): string
 

@@ -5,6 +5,17 @@ import { valid } from 'semver'
 /** Environment variable that selects the Desktop update deployment. */
 export const DESKTOP_AUTO_UPDATE_ENV = 'DSH_DESKTOP_AUTO_UPDATE_ENV'
 
+/**
+ * Resolve the channel embedded in the installer; omitted local settings retain nightly.
+ * @param {NodeJS.ProcessEnv} env Packaging or upload settings.
+ * @returns {'nightly' | 'latest'} Validated channel.
+ */
+export function resolveDesktopUpdateChannel(env) {
+  const channel = env.DSH_DESKTOP_UPDATE_CHANNEL || 'nightly'
+  if (channel !== 'nightly' && channel !== 'latest') throw new Error('desktop auto-update: invalid update channel')
+  return channel
+}
+
 const UPDATE_ENVIRONMENTS = {
   test: {
     originEnvName: 'DOWNLOAD_TEST_ORIGIN',
@@ -79,21 +90,23 @@ export function desktopBuildRecordFilename(target) {
  * Return the electron-builder channel metadata filename for an application version.
  * @param {string} version - Desktop semantic version.
  * @param {NodeJS.Platform} platform - Target platform.
+ * @param {'nightly' | 'latest'} [channel] - Selected channel; omitted means nightly.
  * @param {string} [arch] - Target architecture; Linux manifests are suffixed unless it is x64.
  * @returns {string} Channel metadata filename emitted for the target.
  */
-export function desktopUpdateMetadataFilename(version, platform, arch) {
+export function desktopUpdateMetadataFilename(version, platform, channel = 'nightly', arch) {
   if (valid(version) === null) {
     throw new Error(`desktop auto-update: invalid Desktop version ${JSON.stringify(version)}`)
   }
   if (platform !== 'darwin' && platform !== 'win32' && platform !== 'linux') {
     throw new Error(`desktop auto-update: unsupported metadata platform ${platform}`)
   }
+  resolveDesktopUpdateChannel({ DSH_DESKTOP_UPDATE_CHANNEL: channel })
   // electron-builder names a Linux manifest after its architecture, and electron-updater requests
   // the same name, so a non-x64 Linux build must not look for the x64 file.
   const osSuffix = platform === 'darwin' ? '-mac' : platform === 'linux' ? '-linux' : ''
   const archSuffix = platform === 'linux' && arch !== undefined && arch !== '' && arch !== 'x64' ? `-${arch}` : ''
-  return `nightly${osSuffix}${archSuffix}.yml`
+  return `${channel}${osSuffix}${archSuffix}.yml`
 }
 
 /**
@@ -140,11 +153,12 @@ function httpsOrigin(value, name) {
  * @param {NodeJS.ProcessEnv} env - Packaging or upload environment.
  * @param {NodeJS.Platform} platform - Target Node.js platform.
  * @param {string} arch - Target Node.js architecture.
- * @returns {{ environment: 'test' | 'production' | 'selfhosted', target: 'mac-arm64' | 'mac-x64' | 'win-x64' | 'linux-x64' | 'linux-arm64', origin: string, publicUrl: string, keyPrefix: string, binaryKeyPrefix: string }} Resolved updater configuration.
+ * @returns {{ environment: 'test' | 'production' | 'selfhosted', channel: 'nightly' | 'latest', target: 'mac-arm64' | 'mac-x64' | 'win-x64' | 'linux-x64' | 'linux-arm64', origin: string, publicUrl: string, keyPrefix: string, binaryKeyPrefix: string }} Resolved updater configuration.
  * @throws {Error} When the test deployment lacks a valid HTTPS origin or a 32-character lowercase hexadecimal release ID.
  */
 export function resolveDesktopAutoUpdateConfig(env, platform, arch) {
   const environment = resolveDesktopAutoUpdateEnvironment(env)
+  const channel = resolveDesktopUpdateChannel(env)
   const target = resolveDesktopAutoUpdateTarget(platform, arch)
   const deployment = UPDATE_ENVIRONMENTS[environment]
   let origin = deployment.fixedOrigin
@@ -171,10 +185,11 @@ export function resolveDesktopAutoUpdateConfig(env, platform, arch) {
   const keyPrefix = flat ? releasePrefix : `${releasePrefix}/feeds/${target}`
   return {
     environment,
+    channel,
     target,
     origin,
     keyPrefix,
-    binaryKeyPrefix: flat ? releasePrefix : `${releasePrefix}/bin/${target}`,
+    binaryKeyPrefix: flat ? releasePrefix : `${releasePrefix}/bin/${target}${channel === 'latest' ? '/latest' : ''}`,
     publicUrl: `${origin}/${keyPrefix}/`,
   }
 }
