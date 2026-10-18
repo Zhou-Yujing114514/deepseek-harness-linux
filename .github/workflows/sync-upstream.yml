@@ -101,13 +101,15 @@ jobs:
             echo "- our commits on top: **${AHEAD}**"
           } > summary.md
 
+      # When behind == 0 the steps below are all skipped by their own guards; this
+      # step only prints the friendly message. (exit 0 alone would not stop them.)
       - name: Stop when already current
         if: steps.gap.outputs.behind == '0'
         run: |
           echo "Already up to date with upstream; nothing to do."
-          exit 0
 
       - name: Merge upstream and resolve conflicts
+        if: steps.gap.outputs.behind != '0'
         id: merge
         run: |
           set -uo pipefail
@@ -185,12 +187,13 @@ jobs:
           cat pr-body.md
 
       - name: Push the sync branch
+        if: steps.gap.outputs.behind != '0'
         run: |
           set -euo pipefail
           git push origin "${{ steps.merge.outputs.branch }}"
 
       - name: Open a pull request
-        if: ${{ inputs.open-pr != false }}
+        if: steps.gap.outputs.behind != '0' && inputs.open-pr != false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
