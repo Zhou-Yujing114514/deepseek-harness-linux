@@ -120,4 +120,14 @@ describe('desktop auto-update environment', () => {
     expect(() => desktopUpdateMetadataFilename('not-semver', 'darwin')).toThrow(/invalid Desktop version/u)
     expect(() => desktopUpdateMetadataFilename('1.2.3', 'freebsd')).toThrow(/unsupported metadata platform/u)
   })
+
+  it('suffixes Linux metadata with a non-x64 architecture, matching electron-builder', () => {
+    expect(desktopUpdateMetadataFilename('1.2.3', 'linux', 'nightly', 'x64')).toBe('nightly-linux.yml')
+    expect(desktopUpdateMetadataFilename('1.2.3', 'linux', 'nightly', 'arm64')).toBe('nightly-linux-arm64.yml')
+    expect(desktopUpdateMetadataFilename('1.2.3', 'linux', 'latest', 'x64')).toBe('latest-linux.yml')
+    expect(desktopUpdateMetadataFilename('1.2.3', 'linux', 'latest', 'arm64')).toBe('latest-linux-arm64.yml')
+    // Only Linux manifests carry the architecture; the other platforms share one file.
+    expect(desktopUpdateMetadataFilename('1.2.3', 'darwin', 'latest', 'arm64')).toBe('latest-mac.yml')
+    expect(desktopUpdateMetadataFilename('1.2.3', 'win32', 'latest', 'x64')).toBe('latest.yml')
+  })
 })

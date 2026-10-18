@@ -222,7 +222,7 @@ export async function createDesktopUploadPlan(
   }
 
   if (update.channel === 'latest' && buildVersion.includes('-')) throw new Error('desktop upload: latest requires a stable version')
-  const metadataFilename = desktopUpdateMetadataFilename(buildVersion, target.platform, update.channel)
+  const metadataFilename = desktopUpdateMetadataFilename(buildVersion, target.platform, update.channel, target.arch)
   const metadataPath = join(artifactsRoot, metadataFilename)
   let metadataValue: unknown
   try {

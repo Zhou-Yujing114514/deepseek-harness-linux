@@ -80,7 +80,7 @@ async function fixture(
     const info = await createBlockmap(join(artifactsRoot, `${base}.AppImage`), {},
       { info: { emitArtifactBuildCompleted: async () => {} } }, `${base}.AppImage`)
     expect(Object.hasOwn(info, 'blockMapSize')).toBe(false)
-    await writeFile(join(artifactsRoot, desktopUpdateMetadataFilename(version, 'linux')), `${JSON.stringify({
+    await writeFile(join(artifactsRoot, desktopUpdateMetadataFilename(version, 'linux', channel, arch)), `${JSON.stringify({
       version,
       path: `${base}.AppImage`,
       files: [{
@@ -317,7 +317,7 @@ describe('desktop upload plan', () => {
     expect(plan.artifacts.map(artifact => artifact.filename)).toEqual([
       'deepseek-harness-1.2.3-linux-arm64.AppImage',
       'deepseek-harness-1.2.3-linux-arm64.AppImage.blockmap',
-      'nightly-linux.yml',
+      'nightly-linux-arm64.yml',
     ])
   })
 
