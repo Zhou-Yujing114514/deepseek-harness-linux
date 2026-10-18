@@ -303,11 +303,10 @@ describe('desktop upload plan', () => {
       'deepseek-harness-1.2.3-linux-x64.deb',
       'deepseek-harness-1.2.3-linux-x64.tar.gz',
       'nightly-linux.yml',
-      'latest-linux.yml',
     ])
     const deb = plan.artifacts.find(artifact => artifact.filename.endsWith('.deb'))!
     expect(deb.contentType).toBe('application/vnd.debian.binary-package')
-    expect(plan.artifacts.filter(artifact => artifact.channelMetadata)).toHaveLength(2)
+    expect(plan.artifacts.filter(artifact => artifact.channelMetadata)).toHaveLength(1)
   })
 
   it('skips missing Linux install formats but keeps the AppImage update feed', async () => {
@@ -319,7 +318,6 @@ describe('desktop upload plan', () => {
       'deepseek-harness-1.2.3-linux-arm64.AppImage',
       'deepseek-harness-1.2.3-linux-arm64.AppImage.blockmap',
       'nightly-linux.yml',
-      'latest-linux.yml',
     ])
   })
 

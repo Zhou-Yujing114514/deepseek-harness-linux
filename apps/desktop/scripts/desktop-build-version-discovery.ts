@@ -30,8 +30,19 @@ const LISTING_DEADLINE_MS = 8_000
 /** Objects one listing page may return. */
 const LISTING_PAGE_SIZE = 1000
 
-/** Artifact name electron-builder writes for one build, on either platform; unsigned Windows builds add a suffix. */
-const ARTIFACT = /(?:^|\/)deepseek-harness-(?<version>.+)-(?:mac|win|linux)-(?:arm64|x64)(?:-unsigned)?\.(?:exe|dmg|zip|AppImage|deb|tar\.gz)$/u
+/** Artifact base name electron-builder writes for one build; unsigned and unnotarized builds add a suffix. */
+const ARTIFACT = /(?:^|\/)deepseek-harness-(?<version>.+)-(?:mac|win|linux)-(?:arm64|x64)(?:-unsigned|-unnotarized)?\./u
+/** Installer extensions electron-builder emits for the supported platforms. */
+const INSTALLER = /(?:exe|dmg|zip|AppImage|deb|tar\.gz)$/u
+
+/**
+ * Parse the version one artifact name carries.
+ * @param name - Artifact file name or bucket key to inspect.
+ * @returns the embedded version, or `undefined` when the name is not a build installer.
+ */
+function artifactVersion(name: string): string | undefined {
+  return INSTALLER.test(name) ? ARTIFACT.exec(name)?.groups?.version : undefined
+}
 
 /** Inputs that decide which versions are already taken. */
 export interface DesktopBuildVersionSuggestionOptions {
@@ -77,7 +88,7 @@ function sequenceNumbers(versions: Iterable<string>, prefix: string): number[] {
  */
 async function localVersions(artifactsRoot: string): Promise<string[]> {
   const entries = await readdir(artifactsRoot).catch(() => [])
-  return entries.map(entry => ARTIFACT.exec(entry)?.groups?.version)
+  return entries.map(entry => artifactVersion(entry))
     .filter((version): version is string => version !== undefined && parse(version) !== null)
 }
 
@@ -124,7 +135,7 @@ async function remoteVersions(options: DesktopBuildVersionSuggestionOptions): Pr
         }),
       ])
       for (const key of page.keys) {
-        const version = ARTIFACT.exec(key)?.groups?.version
+        const version = artifactVersion(key)
         if (version !== undefined && parse(version) !== null) versions.push(version)
       }
       marker = page.next

@@ -26,7 +26,9 @@ describe('desktop package target', () => {
   })
 
   it('rejects unsupported targets and hosts before building', () => {
-    expect(() => resolveDesktopPackageTarget('linux-x64', 'linux', 'x64')).toThrow(/unsupported target/u)
+    // This fork adds Linux targets; upstream's own test expects them to be rejected.
+    expect(resolveDesktopPackageTarget('linux-x64', 'linux', 'x64').name).toBe('linux-x64')
+    expect(resolveDesktopPackageTarget('linux-arm64', 'linux', 'arm64').name).toBe('linux-arm64')
     expect(() => resolveDesktopPackageTarget('win-x64', 'darwin', 'arm64')).toThrow(/Windows x64/u)
     expect(() => resolveDesktopPackageTarget('mac-arm64', 'darwin', 'x64')).toThrow(/Apple Silicon/u)
     expect(() => resolveDesktopPackageTarget('mac-arm64', 'linux', 'arm64')).toThrow(/macOS/u)
