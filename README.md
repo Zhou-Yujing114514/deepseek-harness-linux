@@ -78,6 +78,8 @@ pnpm --dir apps/desktop run package:linux:x64                # x64
 pnpm --dir apps/desktop run package:linux:arm64              # arm64
 ```
 
+自托管 Web 模式（`dsh web`）依赖各 workspace 包已构建出的 `lib/` 产物：全新 checkout 直接启动会让 typert-loader 找不到 `lib/typert.host.js` 而报一堆 `ERR_MODULE_NOT_FOUND`，需先执行 `pnpm run build:official`。
+
 `Desktop (Linux)` 工作流会在原生 runner 上按需构建两种架构（`ubuntu-24.04` / `ubuntu-24.04-arm`），产物可在 Actions Artifacts 或自动发布的 Release 中获取。
 
 ## 自动更新

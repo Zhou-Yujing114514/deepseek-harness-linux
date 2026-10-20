@@ -22,7 +22,7 @@ fi
 
 # i18n key `startupFailed`, rendered by the dialog main.ts opens when startup throws.
 FATAL_TITLE="DeepSeek Harness is unavailable"
-FATAL_LOG_PATTERN='desktop policy|The application could not start|Unhandled|fatal'
+FATAL_LOG_PATTERN='desktop policy|The application could not start|Unhandled|\bfatal\b'
 
 shopt -s nullglob
 images=("$directory"/*.AppImage)
