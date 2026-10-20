@@ -251,17 +251,28 @@ async function transferAll(transfers) {
   return `scp (${streams} streams)`
 }
 
-/** Read a remote directory listing as a name -> size map. */
-async function remoteListing(directory) {
+/** Parse `find -printf '%s\t%f\n'` output into a file name -> size map. */
+export function parseRemoteListing(stdout) {
   const listing = new Map()
-  const output = await remote(`ls -l ${JSON.stringify(directory)} 2>/dev/null || true`)
-  for (const line of output.stdout.split('\n')) {
-    const columns = line.trim().split(/\s+/u)
-    if (columns.length < 9) continue
-    const size = Number(columns[4])
-    if (Number.isInteger(size)) listing.set(columns.at(-1), size)
+  for (const line of stdout.split('\n')) {
+    // Split on the first tab only, so a file name that itself contains a tab survives intact.
+    const separator = line.indexOf('\t')
+    if (separator <= 0) continue
+    const size = Number(line.slice(0, separator))
+    if (Number.isInteger(size)) listing.set(line.slice(separator + 1), size)
   }
   return listing
+}
+
+/** Read a remote directory listing as a name -> size map. */
+async function remoteListing(directory) {
+  // Splitting `ls -l` on whitespace loses any name containing a space, and only the last
+  // word would be left to compare sizes against. Print size and bare file name separated
+  // by a tab instead. The script already relies on GNU coreutils and findutils elsewhere.
+  const output = await remote(
+    `find ${JSON.stringify(directory)} -maxdepth 1 -type f -printf '%s\\t%f\\n' 2>/dev/null || true`,
+  )
+  return parseRemoteListing(output.stdout)
 }
 
 /** Push one staged directory to the remote document root, splitting large artifacts across streams. */
