@@ -1,10 +1,10 @@
-/** Remote directory listings have to survive whatever characters a file name carries. */
+/** Remote directory listings, the remote root guard, and credential redaction. */
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
-import { parseRemoteListing } from '../scripts/upload-selfhosted.mjs'
+import { afterEach, describe, expect, it } from 'vitest'
+import { parseRemoteListing, redact, resolveRemoteRoot } from '../scripts/upload-selfhosted.mjs'
 
 // `find -printf` is a GNU extension; the parser cases below stand on their own where it is missing.
 const supportsPrintf = (() => {
@@ -52,5 +52,63 @@ describe('self-hosted remote listing', () => {
     const listing = parseRemoteListing(stdout)
     expect(listing.get('deepseek-harness-0.2.1-linux-x64.AppImage')).toBe(11)
     expect(listing.get('name with spaces.AppImage')).toBe(23)
+  })
+})
+
+describe('self-hosted remote root', () => {
+  const original = process.env.DSH_SELFHOST_REMOTE_ROOT
+  const setRoot = (value: string | undefined) => {
+    if (value === undefined) delete process.env.DSH_SELFHOST_REMOTE_ROOT
+    else process.env.DSH_SELFHOST_REMOTE_ROOT = value
+  }
+  afterEach(() => {
+    setRoot(original)
+  })
+
+  it('strips trailing slashes', () => {
+    setRoot('/var/www/dsh/')
+    expect(resolveRemoteRoot()).toBe('/var/www/dsh')
+  })
+
+  // Stripping the slash turns "/" into "", which would make the chunk directory relative
+  // and every artifact path land at the filesystem root.
+  it('rejects the filesystem root', () => {
+    setRoot('/')
+    expect(() => resolveRemoteRoot()).toThrow(/filesystem root/u)
+  })
+
+  it('rejects a relative path', () => {
+    setRoot('dsh')
+    expect(() => resolveRemoteRoot()).toThrow(/absolute path/u)
+  })
+
+  it('rejects a missing value', () => {
+    setRoot(undefined)
+    expect(() => resolveRemoteRoot()).toThrow(/non-empty/u)
+  })
+})
+
+describe('self-hosted credential redaction', () => {
+  const original = process.env.DSH_SELFHOST_SSH_PASSWORD
+  afterEach(() => {
+    if (original === undefined) delete process.env.DSH_SELFHOST_SSH_PASSWORD
+    else process.env.DSH_SELFHOST_SSH_PASSWORD = original
+  })
+
+  // execFile echoes the whole command line back in the error message of a failed run, so
+  // anything still carrying the password has to be scrubbed before it reaches a log.
+  it('replaces the password wherever it appears in a message', () => {
+    process.env.DSH_SELFHOST_SSH_PASSWORD = 'hunter2'
+    expect(redact('Command failed: sshpass -p hunter2 ssh host')).toBe('Command failed: sshpass -p *** ssh host')
+  })
+
+  it('replaces every occurrence, not just the first', () => {
+    process.env.DSH_SELFHOST_SSH_PASSWORD = 'hunter2'
+    expect(redact('hunter2 and hunter2')).toBe('*** and ***')
+  })
+
+  it('leaves messages untouched when no password is configured', () => {
+    delete process.env.DSH_SELFHOST_SSH_PASSWORD
+    expect(redact('Command failed: ssh host')).toBe('Command failed: ssh host')
   })
 })

@@ -89,6 +89,24 @@ function requiredAmbient(name) {
   return value
 }
 
+/**
+ * Read the remote document root and refuse the values that would publish somewhere else.
+ * Trailing slashes are stripped for path building, and that is exactly what makes a root of
+ * "/" collapse to an empty string: the chunk directory would turn into the relative
+ * "-upload" and every artifact path would land at the filesystem root instead.
+ * @returns {string} Absolute remote directory, without a trailing slash.
+ */
+export function resolveRemoteRoot() {
+  const value = requiredAmbient('DSH_SELFHOST_REMOTE_ROOT').replace(/\/+$/u, '')
+  if (value === '') {
+    throw new Error('desktop self-hosted upload: DSH_SELFHOST_REMOTE_ROOT must not be the filesystem root')
+  }
+  if (!value.startsWith('/')) {
+    throw new Error(`desktop self-hosted upload: DSH_SELFHOST_REMOTE_ROOT must be an absolute path, got ${JSON.stringify(value)}`)
+  }
+  return value
+}
+
 /** Hash one file the way electron-updater verifies it. */
 async function sha512(path) {
   return (await digestPair(path)).base64
@@ -146,6 +164,38 @@ function sshPassword() {
 }
 
 /**
+ * Child environment carrying the SSH password for `sshpass -e`.
+ * Passing it this way keeps the secret out of argv. execFile echoes the full command back in
+ * the error message of a failed run, so anything handed to `-p` ends up in the log verbatim.
+ * @returns {NodeJS.ProcessEnv | undefined} Environment for the child, or undefined for key auth.
+ */
+function sshpassEnvironment() {
+  const password = sshPassword()
+  return password === undefined ? undefined : { ...process.env, SSHPASS: password }
+}
+
+/**
+ * Remove the SSH password from text that is about to be printed.
+ * A belt-and-braces measure: with `-e` the password should no longer reach an error message,
+ * but any command that still echoes it must not make it into a log or a failure summary.
+ * @param {string} message - Text that may contain the password.
+ * @returns {string} The same text with every occurrence replaced.
+ */
+export function redact(message) {
+  const password = sshPassword()
+  return password === undefined ? message : message.split(password).join('***')
+}
+
+/**
+ * Spawn options for one remote command, carrying the password environment when there is one.
+ * @returns {{ maxBuffer: number, env?: NodeJS.ProcessEnv }} Options for execFile.
+ */
+function spawnOptions() {
+  const env = sshpassEnvironment()
+  return { maxBuffer: 1 << 24, ...(env === undefined ? {} : { env }) }
+}
+
+/**
  * Repeat an idempotent remote step when the server drops the connection mid-transfer.
  * Cheap tunnels reset under load; a publish should survive one reset instead of throwing away
  * a twenty-minute build.
@@ -162,7 +212,7 @@ async function withRetry(label, operation, attempts = 4) {
     } catch (error) {
       if (attempt >= attempts) throw error
       const delay = attempt * 5000
-      process.stderr.write(`desktop self-hosted upload: ${label} failed (${error.message}); retry ${attempt}/${attempts - 1} in ${delay}ms\n`)
+      process.stderr.write(`desktop self-hosted upload: ${label} failed (${redact(error.message)}); retry ${attempt}/${attempts - 1} in ${delay}ms\n`)
       await new Promise(resolve => setTimeout(resolve, delay))
     }
   }
@@ -173,8 +223,11 @@ function remote(command) {
   const argv = ['ssh', ...sshOptions(), requiredAmbient('DSH_SELFHOST_SSH_TARGET'), command]
   const password = sshPassword()
   const argv0 = password === undefined ? argv[0] : 'sshpass'
-  const args = password === undefined ? argv.slice(1) : ['-p', password, ...argv]
-  return withRetry(`ssh ${command.slice(0, 40)}`, () => run(argv0, args, { maxBuffer: 1 << 24 }))
+  // -e reads the password from SSHPASS instead of argv. With -p the secret is part of the
+  // command line, and execFile reports the whole command line back in the error message of
+  // every failed run, which puts the password straight into the log.
+  const args = password === undefined ? argv.slice(1) : ['-e', ...argv]
+  return withRetry(`ssh ${command.slice(0, 40)}`, () => run(argv0, args, spawnOptions()))
 }
 
 /** Put one large artifact beside its manifests without duplicating disk usage. */
@@ -228,13 +281,13 @@ async function transferAll(transfers) {
       if (item === undefined) return
       const argv = [...sshOptions('scp'), item.local, `${target}:${item.remote}`]
       const argv0 = password === undefined ? 'scp' : 'sshpass'
-      const args = password === undefined ? argv : ['-p', password, 'scp', ...argv]
+      const args = password === undefined ? argv : ['-e', 'scp', ...argv]
       try {
-        await withRetry(`scp ${basename(item.remote)}`, () => run(argv0, args, { maxBuffer: 1 << 24 }))
+        await withRetry(`scp ${basename(item.remote)}`, () => run(argv0, args, spawnOptions()))
         doneBytes += item.size
         doneFiles += 1
       } catch (error) {
-        failures.push(`${basename(item.remote)}: ${error.message}`)
+        failures.push(`${basename(item.remote)}: ${redact(error.message)}`)
       }
     }
   }
@@ -312,8 +365,18 @@ export async function upload(localDirectory, remoteRoot) {
       continue
     }
     if (present.get(name) === size) {
-      process.stdout.write(`desktop self-hosted upload: ${name} already published, skipping\n`)
-      continue
+      // Equal length is not equal content: a resumed publish, a truncated upload, or a
+      // different build that happens to match in size would all pass a size check. Compare
+      // digests before trusting a file that is already there.
+      const { hex } = await digestPair(local)
+      const published = await remote(
+        `sha512sum -- ${JSON.stringify(`${remoteRoot}/${name}`)} | cut -d' ' -f1`,
+      )
+      if (published.stdout.trim() === hex) {
+        process.stdout.write(`desktop self-hosted upload: ${name} already published, skipping\n`)
+        continue
+      }
+      process.stdout.write(`desktop self-hosted upload: ${name} is present but differs, resending\n`)
     }
     if (size <= CHUNK_THRESHOLD) {
       transfers.push({ local, remote: `${remoteRoot}/${name}`, size })
@@ -347,19 +410,29 @@ export async function upload(localDirectory, remoteRoot) {
 
   for (const item of assemblies) {
     const quoted = item.remotePieces.map(piece => JSON.stringify(piece)).join(' ')
-    await remote(`cat ${quoted} > ${JSON.stringify(item.remoteFile)} && rm -f ${quoted}`)
-    const listing = await remote(`stat -c %s ${JSON.stringify(item.remoteFile)}`)
+    // Assemble beside the document root, never at the published path: a half-written file
+    // must not be what a client following the feed can download. Repeating this is safe
+    // because it rewrites the same staging file from the same pieces.
+    const staging = `${chunkRoot}/${item.name}.assembling`
+    await remote(`cat ${quoted} > ${JSON.stringify(staging)}`)
+    const listing = await remote(`stat -c %s ${JSON.stringify(staging)}`)
     const arrived = Number(listing.stdout.trim())
     if (arrived !== item.size) {
       throw new Error(`desktop self-hosted upload: ${item.name} reassembled to ${arrived} bytes, expected ${item.size}`)
     }
     // A resumed piece reused in the wrong order would assemble into a file of the right
     // length and the wrong bytes, so compare the digest before the feed points at it.
-    const remoteDigest = await remote(`sha512sum -- ${JSON.stringify(item.remoteFile)} | cut -d' ' -f1`)
+    const remoteDigest = await remote(`sha512sum -- ${JSON.stringify(staging)} | cut -d' ' -f1`)
     if (remoteDigest.stdout.trim() !== item.digest) {
-      await remote(`rm -f ${JSON.stringify(item.remoteFile)}`)
+      await remote(`rm -f ${JSON.stringify(staging)}`)
       throw new Error(`desktop self-hosted upload: ${item.name} reassembled to the wrong digest; removed it, rerun to resend`)
     }
+    // Only the verified file takes the published name. chunkRoot sits next to the document
+    // root, so this renames within one filesystem instead of copying the artifact again.
+    await remote(`mv -f ${JSON.stringify(staging)} ${JSON.stringify(item.remoteFile)}`)
+    // Dropping the pieces is deliberately a separate step from the assembly above: kept out
+    // of the retried command, a retry can always rebuild the staging file from them.
+    await remote(`rm -f ${quoted}`)
   }
   // Sweep pieces an abandoned publish left behind; this run consumed its own already.
   await remote(`find ${JSON.stringify(chunkRoot)} -maxdepth 1 -type f -mmin +${STALE_PIECE_MINUTES} -delete 2>/dev/null || true`)
@@ -460,7 +533,7 @@ export async function uploadSelfHostedTarget(argv) {
   process.stdout.write(`desktop self-hosted upload: feed ${update.publicUrl}\n`)
 
   if (values['stage-only'] === true) return
-  const remoteRoot = requiredAmbient('DSH_SELFHOST_REMOTE_ROOT').replace(/\/+$/u, '')
+  const remoteRoot = resolveRemoteRoot()
   const transport = await upload(stage, remoteRoot)
   process.stdout.write(`desktop self-hosted upload: ${transport} -> ${remoteRoot}\n`)
   if (values.prune === true) {
@@ -477,7 +550,7 @@ export async function uploadSelfHostedTarget(argv) {
 
 if (process.argv[1] !== undefined && import.meta.filename === resolve(process.argv[1])) {
   uploadSelfHostedTarget(process.argv.slice(2)).catch(error => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+    process.stderr.write(`${redact(error instanceof Error ? error.message : String(error))}\n`)
     process.exitCode = 1
   })
 }

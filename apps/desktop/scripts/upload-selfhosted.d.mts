@@ -6,6 +6,19 @@
 export function parseRemoteListing(stdout: string): Map<string, number>
 
 /**
+ * Read the remote document root and refuse the values that would publish somewhere else.
+ * @returns Absolute remote directory, without a trailing slash.
+ */
+export function resolveRemoteRoot(): string
+
+/**
+ * Remove the SSH password from text that is about to be printed.
+ * @param message - Text that may contain the password.
+ * @returns The same text with every occurrence replaced.
+ */
+export function redact(message: string): string
+
+/**
  * Push one staged directory to the remote document root, splitting large artifacts across streams.
  * @param localDirectory - Staged artifacts to publish.
  * @param remoteRoot - Directory under the remote document root that receives them.

@@ -192,7 +192,6 @@ jobs:
             apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/artifacts/*.tar.gz
             apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/artifacts/*.yml
             apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/artifacts/*-release.json
-            apps/desktop/.desktop-build/targets/linux-${{ matrix.arch }}/selfhost/*
           if-no-files-found: error
           retention-days: 14
 
