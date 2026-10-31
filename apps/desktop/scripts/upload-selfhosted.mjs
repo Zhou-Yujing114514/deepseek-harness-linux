@@ -128,15 +128,28 @@ async function fileSize(path) {
   return details.size
 }
 
-/** Render one channel manifest matching the electron-builder generic provider schema. */
-function channelManifest(version, filename, digest, size) {
-  return `${dump({
+/**
+ * Render one channel manifest matching the electron-builder generic provider schema.
+ * @param {string} version - Product version the manifest advertises.
+ * @param {string} filename - Artifact file name the client should download.
+ * @param {string} digest - Base64 sha512 of the artifact, as electron-updater verifies it.
+ * @param {number} size - Byte length of the artifact.
+ * @param {number} [blockMapSize] - Byte length of the companion `.blockmap`. When present,
+ *   electron-updater performs a differential download instead of pulling the full artifact.
+ * @returns {string} YAML manifest text for the generic provider.
+ */
+export function channelManifest(version, filename, digest, size, blockMapSize) {
+  const entry = {
     version,
     files: [{ url: filename, sha512: digest, size }],
     path: filename,
     sha512: digest,
     releaseDate: new Date().toISOString(),
-  })}`
+  }
+  if (typeof blockMapSize === 'number' && Number.isFinite(blockMapSize)) {
+    entry.blockMapSize = blockMapSize
+  }
+  return `${dump(entry)}`
 }
 
 /**
@@ -508,8 +521,11 @@ export async function uploadSelfHostedTarget(argv) {
   const digest = await sha512(join(artifactsRoot, appImage))
   process.stdout.write(`desktop self-hosted upload: ${target} ${version} ${appImage} (${size} bytes)\n`)
 
+  // A present blockmap lets electron-updater apply a differential update instead of pulling
+  // the full ~346 MB artifact; advertise its size so the client knows to fetch it.
+  const blockMapSize = await fileSize(join(artifactsRoot, `${appImage}.blockmap`)).catch(() => undefined)
   const suffix = arch === 'x64' ? '' : `-${arch}`
-  const manifest = channelManifest(version, appImage, digest, size)
+  const manifest = channelManifest(version, appImage, digest, size, blockMapSize)
   const metadata = {
     [`nightly-linux${suffix}.yml`]: manifest,
     [`latest-linux${suffix}.yml`]: manifest,

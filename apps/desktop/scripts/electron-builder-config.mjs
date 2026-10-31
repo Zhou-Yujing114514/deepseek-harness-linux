@@ -266,7 +266,7 @@ export function createElectronBuilderConfig(
       executableName: 'deepseek-harness',
       category: 'Development',
       // deb packaging requires a maintainer; AppImage ignores it.
-      maintainer: 'DeepSeek Harness Linux maintainers <maintainers@deepseek-harness-linux.dev>',
+      maintainer: 'DeepSeek Harness Linux maintainers <maintainers@sswwgzs.cn>',
       synopsis: 'DeepSeek Harness desktop application for Linux',
       // AppImage is the auto-update carrier; deb and tar.gz are additional install formats.
       target: ['AppImage', 'deb', 'tar.gz'],

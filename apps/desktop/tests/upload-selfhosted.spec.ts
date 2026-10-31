@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { parseRemoteListing, redact, resolveRemoteRoot } from '../scripts/upload-selfhosted.mjs'
+import { channelManifest, parseRemoteListing, redact, resolveRemoteRoot } from '../scripts/upload-selfhosted.mjs'
 
 // `find -printf` is a GNU extension; the parser cases below stand on their own where it is missing.
 const supportsPrintf = (() => {
@@ -110,5 +110,28 @@ describe('self-hosted credential redaction', () => {
   it('leaves messages untouched when no password is configured', () => {
     delete process.env.DSH_SELFHOST_SSH_PASSWORD
     expect(redact('Command failed: ssh host')).toBe('Command failed: ssh host')
+  })
+})
+
+describe('self-hosted channel manifest', () => {
+  const version = '0.2.1-rc.2'
+  const filename = 'deepseek-harness-0.2.1-rc.2-linux-x64.AppImage'
+  const digest = 'sha512-placeholder'
+  const size = 362829615
+
+  it('omits blockMapSize when no blockmap is supplied', () => {
+    const manifest = channelManifest(version, filename, digest, size)
+    expect(manifest).not.toContain('blockMapSize')
+    expect(manifest).toContain(`size: ${size}`)
+  })
+
+  it('advertises blockMapSize when a blockmap is supplied', () => {
+    const manifest = channelManifest(version, filename, digest, size, 123456)
+    expect(manifest).toContain('blockMapSize: 123456')
+  })
+
+  it('omits blockMapSize for non-finite values', () => {
+    expect(channelManifest(version, filename, digest, size, NaN)).not.toContain('blockMapSize')
+    expect(channelManifest(version, filename, digest, size, undefined)).not.toContain('blockMapSize')
   })
 })

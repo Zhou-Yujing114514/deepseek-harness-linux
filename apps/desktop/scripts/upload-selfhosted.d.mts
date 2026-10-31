@@ -6,6 +6,23 @@
 export function parseRemoteListing(stdout: string): Map<string, number>
 
 /**
+ * Render one channel manifest matching the electron-builder generic provider schema.
+ * @param version - Product version the manifest advertises.
+ * @param filename - Artifact file name the client should download.
+ * @param digest - Base64 sha512 of the artifact.
+ * @param size - Byte length of the artifact.
+ * @param blockMapSize - Byte length of the companion `.blockmap`; enables differential updates.
+ * @returns YAML manifest text for the generic provider.
+ */
+export function channelManifest(
+  version: string,
+  filename: string,
+  digest: string,
+  size: number,
+  blockMapSize?: number,
+): string
+
+/**
  * Read the remote document root and refuse the values that would publish somewhere else.
  * @returns Absolute remote directory, without a trailing slash.
  */
