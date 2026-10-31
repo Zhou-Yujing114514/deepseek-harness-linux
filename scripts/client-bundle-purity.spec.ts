@@ -214,6 +214,7 @@ describe('client bundle purity gate', () => {
     expect(resolveId('@deepseek-ai/dsh-session/surface')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-brand')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-deque')).toBeNull()
+    expect(resolveId('@deepseek-ai/dsh-util-time')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-util-values')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-token-meter/client')).toBeNull()
     expect(() => resolveId('@deepseek-ai/dsh-token-meter')).toThrow(/purity/)
@@ -227,11 +228,51 @@ describe('client bundle purity gate', () => {
     expect(() => resolveId('@deepseek-ai/dsh-plugin-manager/registry/internal')).toThrow(/purity/)
   })
 
+  it('omits unused RRULE code from a Cron-only browser import', async () => {
+    const builds = await build({
+      config: false, platform: 'browser', format: ['esm'], entry: ['cron-only'],
+      write: false, clean: false, exports: false, report: false, logLevel: 'silent',
+      plugins: [{
+        name: 'cron-only',
+        resolveId: id => id === 'cron-only' ? id : null,
+        load: id => id === 'cron-only'
+          ? `export { Cron } from ${JSON.stringify(join(packageDir('util/time'), 'src/index.ts'))}` : null,
+      }],
+    })
+    try {
+      const modules = builds.flatMap(bundle => bundle.chunks).flatMap(chunk => chunk.type === 'chunk' ? chunk.moduleIds : [])
+        .map(id => id.replaceAll('\\', '/'))
+      expect(modules.some(id => id.endsWith('/time/src/cron.ts'))).toBe(true)
+      expect(modules.some(id => id.includes('/rrule'))).toBe(false)
+    } finally {
+      for (const bundle of builds) await bundle[Symbol.asyncDispose]()
+    }
+  })
+
   it('admits only the pure spill notice entry, not its Host policy', () => {
     expect(resolveId('@deepseek-ai/dsh-spill-policy/notice')).toBeNull()
     expect(resolveId('@deepseek-ai/dsh-output-retention')).toBeNull()
     expect(() => resolveId('@deepseek-ai/dsh-spill-policy')).toThrow(/purity/)
     expect(() => resolveId('@deepseek-ai/dsh-spill-policy/notice/internal')).toThrow(/purity/)
+  })
+
+  it.each(['file-drag'])('inlines the stateless %s entry without admitting its subpaths or UI plugin', (name) => {
+    expect(resolveId(`@deepseek-ai/dsh-util-${name}`)).toBeNull()
+    expect(() => resolveId(`@deepseek-ai/dsh-util-${name}/internal`)).toThrow(/purity/)
+    expect(() => resolveId(`@deepseek-ai/dsh-client-ui-${name}`)).toThrow(/purity/)
+    const deps = clientConfigs()[0]?.deps as { neverBundle: (specifier: string) => boolean }
+    expect(deps.neverBundle(`@deepseek-ai/dsh-util-${name}`)).toBe(false)
+  })
+
+  it('inlines the browser-safe Timer entry while sharing Cordis through the module table', () => {
+    const timer = '@deepseek-ai/cordis-plugin-timer'
+    expect(resolveId(timer)).toBeNull()
+    expect(() => resolveId(`${timer}/src/index.ts`)).toThrow(/purity/)
+    expect(() => resolveId('@deepseek-ai/cordis-plugin-hmr')).toThrow(/purity/)
+    const config = clientConfigs(packageDir('extensions/cordis-client-runner'))[0]
+    const deps = config?.deps as { neverBundle: (specifier: string) => boolean }
+    expect(deps.neverBundle(timer)).toBe(false)
+    expect(deps.neverBundle('@deepseek-ai/cordis')).toBe(true)
   })
 
   it('lets exact generated Remote contributions inline without admitting their package implementation', () => {
