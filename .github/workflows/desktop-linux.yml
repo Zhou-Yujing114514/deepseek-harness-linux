@@ -98,7 +98,13 @@ jobs:
 
       # The preflight in check:package probes FUSE 2.
       - name: Install AppImage build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libfuse2
+        run: |
+          sudo apt-get update
+          # FUSE 2 was renamed libfuse2t64 on Ubuntu 24.04 / Debian 13 (the 64-bit time_t
+          # transition); installing only the legacy name fails on those runners. Try the new
+          # name first and fall back to the old one so jammy and noble both resolve it.
+          sudo apt-get install -y --no-install-recommends libfuse2t64 2>/dev/null \
+            || sudo apt-get install -y --no-install-recommends libfuse2
 
       - name: Validate packaging configuration and toolchain
         run: pnpm --dir apps/desktop run check:package
@@ -161,7 +167,13 @@ jobs:
 
       # electron-builder's AppImage tool requires FUSE2 at build time on Ubuntu 24.04 runners.
       - name: Install AppImage build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libfuse2
+        run: |
+          sudo apt-get update
+          # FUSE 2 was renamed libfuse2t64 on Ubuntu 24.04 / Debian 13 (the 64-bit time_t
+          # transition); installing only the legacy name fails on those runners. Try the new
+          # name first and fall back to the old one so jammy and noble both resolve it.
+          sudo apt-get install -y --no-install-recommends libfuse2t64 2>/dev/null \
+            || sudo apt-get install -y --no-install-recommends libfuse2
 
       - uses: ./.github/actions/prepare-linux-env
         with:

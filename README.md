@@ -14,8 +14,8 @@
 ## 核心特性
 
 - 🐧 **Linux 原生支持**：为 DeepSeek 官方桌面端提供社区 Linux 桌面端打包的下游项目 —— Ubuntu / Debian / 树莓派 5 / ARM 服务器都能跑。
-- 📦 **三种安装包**：AppImage（单文件免安装、支持自动更新）、`.deb`（Debian / Ubuntu 原生包管理）、`.tar.gz`（便携解压即用）。
-- 🔄 **自动更新**：AppImage 通过 `electron-updater` 走 HTTPS 更新通道，下载时校验 SHA256。
+- 📦 **三种安装包**：AppImage（单文件免安装、支持自动更新）、`.deb`（Debian / Ubuntu 原生包管理）、`.tar.gz`（便携解压即用）。**仅 AppImage 支持应用内自动更新**，deb / tar.gz 需手动下载新版替换。
+- 🔄 **自动更新**：AppImage 通过 `electron-updater` 走 HTTPS 更新通道，按更新描述符（yml）内声明的 **sha512** 校验下载产物。
 - 🧩 **功能完整**：agent 内核、插件体系、联网、前端全部跟随上游，Linux 下与官方体验一致（仅 Office 文档转换暂缺）。
 - 🏠 **可自托管**：本地运行 `dsh web` 或安装桌面端，数据留在本机，适合隐私敏感与内网场景。
 - 🆓 **开源免费**：基于上游 MIT 许可证分发。
@@ -26,9 +26,11 @@
 
 | 格式 | 用途 | 典型文件名 |
 |------|------|-----------|
-| **AppImage** | 单文件免安装，支持自动更新 | `deepseek-harness-0.2.0-rc.3-linux-x64.AppImage` |
-| **.deb** | Debian / Ubuntu 系原生包管理 | `deepseek-harness-0.2.0-rc.3-linux-x64.deb` |
-| **.tar.gz** | 便携解压即用 | `deepseek-harness-0.2.0-rc.3-linux-x64.tar.gz` |
+| **AppImage** | 单文件免安装，支持自动更新 | `deepseek-harness-<版本>-linux-x64.AppImage` |
+| **.deb** | Debian / Ubuntu 系原生包管理 | `deepseek-harness-<版本>-linux-amd64.deb` |
+| **.tar.gz** | 便携解压即用 | `deepseek-harness-<版本>-linux-x64.tar.gz` |
+
+> 文件名中的 `<版本>` 替换为实际发布版本（当前为 `0.2.1-rc.2`）。
 
 支持架构：`x64`（AMD / Intel）、`arm64`（树莓派 5、Apple Silicon 上的 Linux、ARM 服务器等）。
 
@@ -84,7 +86,9 @@ pnpm --dir apps/desktop run package:linux:arm64              # arm64
 
 ## 自动更新
 
-AppImage 通过 `electron-updater` 走 AppImage 更新通道，更新描述符为 `nightly-linux.yml`，全程 HTTPS。未签名构建下，更新**仅依赖 HTTPS 传输与 feed 元数据校验**，无代码签名验签——请勿用于高信任场景，下载时务必核对 Release 附带的 SHA256。
+AppImage 通过 `electron-updater` 走 AppImage 更新通道，更新描述符为 `nightly-linux.yml`，全程 HTTPS。未签名构建下，更新**仅依赖 HTTPS 传输与 feed 元数据校验**，无代码签名验签——请勿用于高信任场景。
+
+自动更新由 `electron-updater` 校验描述符内声明的 **sha512**；手动下载时请核对 Release 附带的 `SHA256SUMS.txt`。
 
 ## 已知限制
 
@@ -96,7 +100,8 @@ AppImage 通过 `electron-updater` 走 AppImage 更新通道，更新描述符�
 ## 与上游的关系
 
 - 上游：[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)（MIT，DeepSeek-AI）。
-- 本仓库是其下游 fork：**agent 内核与官方保持同步**，新增内容仅限于 Linux 打包层——CI 工作流、electron-builder 配置、类型声明补全、POSIX launcher 兼容、桌面端打包说明与冒烟测试脚本。
+- 本仓库是其下游 fork：主动改动限于 Linux 移植层——CI 工作流、electron-builder 配置、类型声明补全、POSIX launcher 兼容、桌面端打包说明与冒烟测试脚本。
+- **移植层之外的差异来自版本滞后，尚未逐项追平上游**：本仓库按 rc 节奏 rebase 上游，落后期间会缺失部分上游新增文件。当前基线 commit 与版本对应关系见各次 Release notes，不要假定内核与官方逐提交同步。
 - 后续希望将 Linux 打包经验整理后反馈给上游，供官方参考。
 
 ## 安全须知
@@ -113,7 +118,9 @@ AppImage 通过 `electron-updater` 走 AppImage 更新通道，更新描述符�
 - **DeepSeek 客户端下载** / **DeepSeek 桌面客户端** / **DeepSeek desktop for Linux**
 - **DeepSeek AppImage** / **DeepSeek .deb** / **Ubuntu DeepSeek** / **Debian 安装 DeepSeek**
 - **树莓派 DeepSeek** / **ARM64 DeepSeek** / **DeepSeek Linux 安装包**
-- **开源 DeepSeek 客户端** / **self-hosted DeepSeek** / **本地运行 DeepSeek** / **Linux AI 助手**
+- **开源 DeepSeek 客户端** / **self-hosted DeepSeek** / **Linux AI 助手**
+
+> 说明：本项目是**桌面客户端**，模型能力由 DeepSeek 官方 API 提供，**不内置离线模型**，也不等同于"在本地跑模型"。如需接入自托管或第三方模型，请在客户端内自行配置对应的 API 端点与密钥。
 
 ## 许可证
 

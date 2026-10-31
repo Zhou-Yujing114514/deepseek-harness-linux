@@ -115,6 +115,8 @@ pnpm --dir apps/desktop run package:linux:arm64              # ARM64：AppImage 
 - **树莓派 DeepSeek** / **ARM64 DeepSeek** / **DeepSeek Linux 安装**
 - **开源 DeepSeek** / **本地部署 DeepSeek** / **自托管 AI 助手** / **DeepSeek 智能体**
 
+> 说明：本项目是**桌面客户端**，模型能力由 DeepSeek 官方 API 提供，**不内置离线模型**，也不等同于"在本地跑模型"；"本地部署 / 自托管"指的是客户端与 Web UI 部署在你自己的机器上。如需接入自托管或第三方模型，请在客户端内自行配置对应的 API 端点与密钥。
+
 ## 许可证
 
 [MIT](LICENSE)
