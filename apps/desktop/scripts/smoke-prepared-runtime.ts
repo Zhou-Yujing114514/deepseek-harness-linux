@@ -17,10 +17,12 @@ import { verifyRuntimeArchive } from './verify-runtime-archive.ts'
  * @param node Target Electron executable.
  * @param resourcesRuntime External runtime directory beside the archive.
  * @param descriptor Runtime descriptor already verified against the selected target, which may differ from the build host.
+ * @param skipOfficeConversion Skip the Office conversion checks, for targets bundling no LibreOffice Kit.
  * @returns Resolves after archive integrity, payload checks, Host startup, Office conversion and teardown.
  */
 export async function smokePreparedRuntime(
   root: string, node: string, resourcesRuntime: string, descriptor: DesktopRuntimeDescriptor,
+  skipOfficeConversion = false,
 ): Promise<void> {
   const cache = await mkdtemp(join(tmpdir(), 'desktop-native-smoke-'))
   const environment = { ...scrubWindowsSigningEnvironment(process.env), NODE_OPTIONS: '',
@@ -42,7 +44,7 @@ export async function smokePreparedRuntime(
       throw error
     })
     process.stdout.write(stdout)
-    await smokeDesktopRuntime(root, node, descriptor, environment, resourcesRuntime)
+    await smokeDesktopRuntime(root, node, descriptor, environment, resourcesRuntime, skipOfficeConversion)
   } finally {
     await rm(cache, { recursive: true, force: true })
   }

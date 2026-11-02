@@ -19,10 +19,13 @@ import type { DesktopRuntimeDescriptor } from '../src/runtime-tree.ts'
  * @param runtime - Verified resource descriptor.
  * @param environment - Credential-scrubbed build environment and private native cache.
  * @param resourcesRuntime - Bundled interpreters outside the application archive.
+ * @param skipOfficeConversion - Skip the Office-to-PDF and skill CLI checks, for targets whose
+ *   application bundle carries no LibreOffice Kit native modules.
  * @returns Resolves after checks and teardown; rejects on a check or teardown failure.
  */
 export async function smokeDesktopRuntime(
   root: string, node: string, runtime: DesktopRuntimeDescriptor, environment: NodeJS.ProcessEnv, resourcesRuntime: string,
+  skipOfficeConversion = false,
 ): Promise<void> {
   const home = mkdtempSync(join(tmpdir(), 'dsh-desktop-smoke-'))
   const profile = join(home, 'profiles', 'desktop')
@@ -165,26 +168,33 @@ export function apply(ctx) {
     if (!installation.ok || !installed.ok || await installed.text() !== 'installed plugin ready') {
       throw new Error(`desktop runtime: bundled pnpm plugin installation failed: ${installationResult}`)
     }
-    for (const { extension } of inputs) {
-      const converted = await fetch(new URL(`/desktop-smoke-office/${extension}`, ready.url), {
+    if (skipOfficeConversion) {
+      // The packaged Linux app carries no LibreOffice Kit native modules, so these checks
+      // cannot pass there by construction. Skip them instead of failing: a build that
+      // tolerates the resulting error would also swallow genuine runtime faults (A-10).
+      console.log('desktop runtime: skipping Office conversion checks for a target that bundles no LibreOffice Kit')
+    } else {
+      for (const { extension } of inputs) {
+        const converted = await fetch(new URL(`/desktop-smoke-office/${extension}`, ready.url), {
+          headers: { cookie }, signal: AbortSignal.timeout(120_000),
+        })
+        if (!converted.ok) throw new Error(`desktop runtime: ${extension} conversion failed: ${await converted.text()}`)
+        const pdf = Buffer.from(await converted.arrayBuffer())
+        if (!/^%PDF-\d\.\d/u.test(pdf.subarray(0, 8).toString())
+          || !pdf.subarray(-1024).toString().trimEnd().endsWith('%%EOF')) {
+          throw new Error(`desktop runtime: invalid ${extension} PDF output`)
+        }
+      }
+      const cliResponse = await fetch(new URL('/desktop-smoke-office-cli', ready.url), {
         headers: { cookie }, signal: AbortSignal.timeout(120_000),
       })
-      if (!converted.ok) throw new Error(`desktop runtime: ${extension} conversion failed: ${await converted.text()}`)
-      const pdf = Buffer.from(await converted.arrayBuffer())
-      if (!/^%PDF-\d\.\d/u.test(pdf.subarray(0, 8).toString())
-        || !pdf.subarray(-1024).toString().trimEnd().endsWith('%%EOF')) {
-        throw new Error(`desktop runtime: invalid ${extension} PDF output`)
+      if (!cliResponse.ok) throw new Error(`desktop runtime: skill CLI failed: ${await cliResponse.text()}`)
+      const cliResult = await cliResponse.json() as { capabilities: { runtime: { cliPath: string } }; pdf: string }
+      if (!cliResult.capabilities.runtime.cliPath.endsWith('cli.js') || Buffer.from(cliResult.pdf, 'base64').subarray(0, 5).toString() !== '%PDF-') {
+        throw new Error('desktop runtime: skill CLI did not return capabilities and a PDF')
       }
+      console.log('desktop runtime: DOCX, XLSX, PPTX to PDF and skill CLI discovery passed')
     }
-    const cliResponse = await fetch(new URL('/desktop-smoke-office-cli', ready.url), {
-      headers: { cookie }, signal: AbortSignal.timeout(120_000),
-    })
-    if (!cliResponse.ok) throw new Error(`desktop runtime: skill CLI failed: ${await cliResponse.text()}`)
-    const cliResult = await cliResponse.json() as { capabilities: { runtime: { cliPath: string } }; pdf: string }
-    if (!cliResult.capabilities.runtime.cliPath.endsWith('cli.js') || Buffer.from(cliResult.pdf, 'base64').subarray(0, 5).toString() !== '%PDF-') {
-      throw new Error('desktop runtime: skill CLI did not return capabilities and a PDF')
-    }
-    console.log('desktop runtime: DOCX, XLSX, PPTX to PDF and skill CLI discovery passed')
   } finally {
     clearTimeout(timer)
     try { await host.stop() } finally {

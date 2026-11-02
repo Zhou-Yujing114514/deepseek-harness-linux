@@ -3,8 +3,16 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { deflateRawSync, gzipSync } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
-import { channelManifest, parseRemoteListing, redact, resolveRemoteRoot } from '../scripts/upload-selfhosted.mjs'
+import {
+  channelManifest,
+  parseEmbeddedBlockMap,
+  parseManifestVersion,
+  parseRemoteListing,
+  redact,
+  resolveRemoteRoot,
+} from '../scripts/upload-selfhosted.mjs'
 
 // `find -printf` is a GNU extension; the parser cases below stand on their own where it is missing.
 const supportsPrintf = (() => {
@@ -133,5 +141,68 @@ describe('self-hosted channel manifest', () => {
   it('omits blockMapSize for non-finite values', () => {
     expect(channelManifest(version, filename, digest, size, NaN)).not.toContain('blockMapSize')
     expect(channelManifest(version, filename, digest, size, undefined)).not.toContain('blockMapSize')
+  })
+})
+
+describe('parseEmbeddedBlockMap', () => {
+  // Mirrors app-builder-lib's appendBlockmap(): deflate-compressed map, then a 4-byte
+  // big-endian length. electron-updater locates it with fileSize - (blockMapSize + 4).
+  const tail = (payload: unknown, compression: 'deflate' | 'gzip' = 'deflate') => {
+    const compressed = compression === 'deflate'
+      ? deflateRawSync(Buffer.from(JSON.stringify(payload)))
+      : gzipSync(Buffer.from(JSON.stringify(payload)))
+    const header = Buffer.alloc(4)
+    header.writeUInt32BE(compressed.length, 0)
+    return Buffer.concat([compressed, header])
+  }
+  const blockMap = { version: '2', files: [{ name: 'file', offset: 0, checksums: ['a'], sizes: [1] }] }
+
+  it('reads the block map length electron-builder appends to an AppImage', () => {
+    const buffer = tail(blockMap)
+    expect(parseEmbeddedBlockMap(buffer)).toBe(buffer.length - 4)
+  })
+
+  it('rejects a tail that is not a block map', () => {
+    // A build without an appended map would leave arbitrary bytes at the end of the file.
+    expect(parseEmbeddedBlockMap(tail({ unrelated: true }))).toBeUndefined()
+    expect(parseEmbeddedBlockMap(tail({ version: '2' }))).toBeUndefined()
+  })
+
+  it('rejects a gzip-compressed tail', () => {
+    // AppImage embeds raw deflate; a gzip payload must not be mistaken for a block map.
+    expect(parseEmbeddedBlockMap(tail(blockMap, 'gzip'))).toBeUndefined()
+  })
+
+  it('rejects tails that are too short to carry a length', () => {
+    expect(parseEmbeddedBlockMap(Buffer.alloc(0))).toBeUndefined()
+    expect(parseEmbeddedBlockMap(Buffer.alloc(4))).toBeUndefined()
+  })
+
+  it('rejects a length that disagrees with the payload', () => {
+    const buffer = tail(blockMap)
+    buffer.writeUInt32BE(buffer.length, buffer.length - 4)
+    expect(parseEmbeddedBlockMap(buffer)).toBeUndefined()
+  })
+})
+
+describe('parseManifestVersion', () => {
+  const version = '0.2.1-rc.2'
+  const filename = 'deepseek-harness-0.2.1-rc.2-linux-x86_64.AppImage'
+  const digest = 'ZGlnZXN0'
+  const size = 4242
+
+  it('reads the version a feed advertises', () => {
+    expect(parseManifestVersion(channelManifest(version, filename, digest, size))).toBe(version)
+  })
+
+  it('reads a quoted version', () => {
+    expect(parseManifestVersion(`version: '${version}'\nfiles: []\n`)).toBe(version)
+    expect(parseManifestVersion(`version: "${version}"\nfiles: []\n`)).toBe(version)
+  })
+
+  it('returns undefined when there is no version to read', () => {
+    // The first publish reads a feed that does not exist yet.
+    expect(parseManifestVersion('')).toBeUndefined()
+    expect(parseManifestVersion('files: []\npath: x.AppImage\n')).toBeUndefined()
   })
 })

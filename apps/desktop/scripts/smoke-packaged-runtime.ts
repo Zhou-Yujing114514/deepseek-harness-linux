@@ -39,4 +39,6 @@ const executable = windows ? join(application, 'DeepSeek Harness.exe')
 const descriptor = await verifyDesktopRuntime(paths.dsh, readDesktopRuntime(paths.dsh).release.version,
   resolveDesktopPackageTarget(target))
 if (windows && !values.unsigned) await verifyWindowsCode(application)
-await smokePreparedRuntime(join(resources, 'app.asar', 'dsh'), executable, join(resources, 'runtime'), descriptor)
+// The packaged Linux app bundles no LibreOffice Kit native modules, so its Office checks
+// cannot pass. Skipping them here keeps every other packaged-runtime failure fatal.
+await smokePreparedRuntime(join(resources, 'app.asar', 'dsh'), executable, join(resources, 'runtime'), descriptor, linux)

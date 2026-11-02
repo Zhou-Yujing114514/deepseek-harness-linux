@@ -560,17 +560,10 @@ export async function packageTarget(
     // Signed macOS builds, unsigned macOS builds and every non-macOS target share this path:
     // electron-builder assembles the artifacts directly, and the config decides notarization.
     await signedStage('artifacts', () => execute(desktopElectronBuilderArguments(target, invocation.directory), electronBuilderEnv))
-    // Linux builds tolerate the packaged-runtime smoke test: the optional LibreOffice Kit native
-    // modules are not yet bundled for Linux, so the Office-to-PDF conversion check cannot run.
-    try {
-      await execute(['exec', 'tsx', 'scripts/smoke-packaged-runtime.ts', ...(invocation.unsigned ? ['--unsigned'] : []), ...(invocation.skipNotarization ? ['--skip-notarization'] : [])], targetEnv)
-    } catch (error) {
-      if (target.platform === 'linux') {
-        process.stderr.write(`desktop package: linux smoke skipped (bundled Office native modules not yet available): ${String(error)}\n`)
-      } else {
-        throw error
-      }
-    }
+    // The packaged-runtime smoke now skips the Office checks on Linux (no LibreOffice Kit is
+    // bundled there), so any remaining failure is real and must stop the build. The catch that
+    // used to sit here also swallowed runtime sealing mismatches (audit A-10).
+    await execute(['exec', 'tsx', 'scripts/smoke-packaged-runtime.ts', ...(invocation.unsigned ? ['--unsigned'] : []), ...(invocation.skipNotarization ? ['--skip-notarization'] : [])], targetEnv)
   }
   if (!invocation.directory && !invocation.unsigned && !invocation.skipNotarization) {
     writeReleaseRecord(target, electronBuilderEnv, buildPaths.artifacts)

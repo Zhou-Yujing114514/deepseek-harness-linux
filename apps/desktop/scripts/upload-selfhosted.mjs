@@ -10,11 +10,12 @@
 
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { cp, link, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { cp, link, mkdir, open, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { parseArgs } from 'node:util'
+import { inflateRawSync } from 'node:zlib'
 import { valid } from 'semver'
 import { dump } from 'js-yaml'
 import { desktopTargetBuildPaths } from './desktop-build-paths.mjs'
@@ -128,14 +129,63 @@ async function fileSize(path) {
   return details.size
 }
 
+/** A block map is a tiny fraction of the artifact; never read more than this to look for one. */
+const MAX_BLOCK_MAP_BYTES = 32 * 1024 * 1024
+
+/**
+ * Read the block map length electron-builder appends to an AppImage.
+ *
+ * An AppImage has no companion `.blockmap` file: `appendBlockmap()` writes the deflate-compressed
+ * map followed by a 4-byte big-endian length, and `FileWithEmbeddedBlockMapDifferentialDownloader`
+ * locates it with `fileSize - (blockMapSize + 4)`. Advertising that length is what lets the client
+ * download only the changed blocks instead of the whole artifact (audit P-01).
+ * @param {Buffer} tail - Compressed block map followed by its 4-byte big-endian length.
+ * @returns {number | undefined} Byte length of the compressed block map, or undefined when the
+ *   tail is not a block map.
+ */
+export function parseEmbeddedBlockMap(tail) {
+  if (tail.length < 5) return undefined
+  const size = tail.length - 4
+  if (tail.readUInt32BE(size) !== size) return undefined
+  try {
+    const blockMap = JSON.parse(inflateRawSync(tail.subarray(0, size)).toString('utf8'))
+    return typeof blockMap?.version === 'string' && Array.isArray(blockMap.files) ? size : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Read the embedded block map size from a packaged AppImage.
+ * @param {string} path - AppImage to inspect.
+ * @returns {Promise<number | undefined>} The block map size to advertise, or undefined when the
+ *   file carries none — a wrong value would make the updater read from a nonsensical offset.
+ */
+async function embeddedBlockMapSize(path) {
+  const handle = await open(path, 'r')
+  try {
+    const { size: fileSize } = await handle.stat()
+    if (fileSize < 8) return undefined
+    const header = Buffer.alloc(4)
+    await handle.read(header, 0, 4, fileSize - 4)
+    const size = header.readUInt32BE(0)
+    if (size <= 0 || size > MAX_BLOCK_MAP_BYTES || size + 4 > fileSize) return undefined
+    const tail = Buffer.alloc(size + 4)
+    await handle.read(tail, 0, size + 4, fileSize - size - 4)
+    return parseEmbeddedBlockMap(tail)
+  } finally {
+    await handle.close()
+  }
+}
+
 /**
  * Render one channel manifest matching the electron-builder generic provider schema.
  * @param {string} version - Product version the manifest advertises.
  * @param {string} filename - Artifact file name the client should download.
  * @param {string} digest - Base64 sha512 of the artifact, as electron-updater verifies it.
  * @param {number} size - Byte length of the artifact.
- * @param {number} [blockMapSize] - Byte length of the companion `.blockmap`. When present,
- *   electron-updater performs a differential download instead of pulling the full artifact.
+ * @param {number} [blockMapSize] - Byte length of the block map appended to the AppImage. When
+ *   present, electron-updater performs a differential download instead of pulling the full artifact.
  * @returns {string} YAML manifest text for the generic provider.
  */
 export function channelManifest(version, filename, digest, size, blockMapSize) {
@@ -456,11 +506,36 @@ export async function upload(localDirectory, remoteRoot) {
 }
 
 /** Delete superseded artifacts of the same architecture so the server keeps current versions. */
-async function prune(remoteRoot, arch, keep) {
+/** Read the `version:` field out of a rendered channel manifest. */
+export function parseManifestVersion(contents) {
+  const match = /^\s*version:\s*(.+?)\s*$/mu.exec(contents)
+  if (match === null) return undefined
+  const value = match[1].replaceAll(/^['"]|['"]$/gu, '')
+  return value === '' ? undefined : value
+}
+
+/**
+ * Read the version the remote feed advertises right now.
+ * @returns The published version, or undefined when no feed exists yet — the very first
+ *   publish has nothing to roll back to.
+ */
+async function remotePublishedVersion(remoteRoot, manifestName) {
+  // `|| true` keeps an absent feed from looking like a transport failure: withRetry would
+  // otherwise spend four attempts on a file that is legitimately missing.
+  const result = await remote(`cat ${JSON.stringify(join(remoteRoot, manifestName))} 2>/dev/null || true`)
+  return parseManifestVersion(result.stdout)
+}
+
+async function prune(remoteRoot, arch, keep, keepVersion) {
   const listing = await remote(`ls -1 ${JSON.stringify(remoteRoot)}`)
   const pattern = /^deepseek-harness-.*-linux-([A-Za-z0-9_]+)\./u
+  // Keep the release the feed advertised before this publish: a bad update can then be
+  // undone by pointing the feed back at it, instead of rebuilding the whole pipeline (S-02).
+  const rollbackPrefix = keepVersion === undefined ? undefined
+    : `deepseek-harness-${keepVersion}-linux-`
   const stale = listing.stdout.split('\n').map(line => line.trim())
     .filter(line => line !== '' && !keep.includes(line))
+    .filter(line => rollbackPrefix === undefined || !line.startsWith(rollbackPrefix))
     .filter(line => {
       const match = pattern.exec(line)
       return match !== null && ARCHITECTURE_SPELLINGS.get(match[1]) === arch
@@ -521,9 +596,10 @@ export async function uploadSelfHostedTarget(argv) {
   const digest = await sha512(join(artifactsRoot, appImage))
   process.stdout.write(`desktop self-hosted upload: ${target} ${version} ${appImage} (${size} bytes)\n`)
 
-  // A present blockmap lets electron-updater apply a differential update instead of pulling
-  // the full ~346 MB artifact; advertise its size so the client knows to fetch it.
-  const blockMapSize = await fileSize(join(artifactsRoot, `${appImage}.blockmap`)).catch(() => undefined)
+  // electron-builder appends the compressed block map to the AppImage itself rather than
+  // writing a companion .blockmap file; advertising its size is what lets electron-updater
+  // download only the changed blocks (audit P-01).
+  const blockMapSize = await embeddedBlockMapSize(join(artifactsRoot, appImage)).catch(() => undefined)
   const suffix = arch === 'x64' ? '' : `-${arch}`
   const manifest = channelManifest(version, appImage, digest, size, blockMapSize)
   const metadata = {
@@ -550,10 +626,17 @@ export async function uploadSelfHostedTarget(argv) {
 
   if (values['stage-only'] === true) return
   const remoteRoot = resolveRemoteRoot()
+  // Read the feed before the upload replaces it: whatever it advertises becomes the
+  // rollback target that prune() has to preserve.
+  const rollbackVersion = values.prune === true
+    ? await remotePublishedVersion(remoteRoot, `latest-linux${suffix}.yml`) : undefined
   const transport = await upload(stage, remoteRoot)
   process.stdout.write(`desktop self-hosted upload: ${transport} -> ${remoteRoot}\n`)
   if (values.prune === true) {
-    const removed = await prune(remoteRoot, arch, staged)
+    if (rollbackVersion !== undefined && rollbackVersion !== version) {
+      process.stdout.write(`desktop self-hosted upload: retaining ${rollbackVersion} as the rollback target\n`)
+    }
+    const removed = await prune(remoteRoot, arch, staged, rollbackVersion)
     if (removed.length > 0) process.stdout.write(`desktop self-hosted upload: pruned ${removed.join(', ')}\n`)
   }
   if (values.verify === true) {

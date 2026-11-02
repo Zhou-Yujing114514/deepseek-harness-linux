@@ -23,6 +23,20 @@ export function channelManifest(
 ): string
 
 /**
+ * Read the block map length electron-builder appends to an AppImage.
+ * @param tail - Compressed block map followed by its 4-byte big-endian length.
+ * @returns Byte length of the compressed block map, or undefined when the tail is not one.
+ */
+export function parseEmbeddedBlockMap(tail: Buffer): number | undefined
+
+/**
+ * Read the `version:` field out of a rendered channel manifest.
+ * @param contents - Manifest text, as produced by `channelManifest()`.
+ * @returns The advertised version, or undefined when the text carries none.
+ */
+export function parseManifestVersion(contents: string): string | undefined
+
+/**
  * Read the remote document root and refuse the values that would publish somewhere else.
  * @returns Absolute remote directory, without a trailing slash.
  */
