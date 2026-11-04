@@ -379,7 +379,10 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}（Linux）
-          prerelease: true
+          # This fork publishes its RC builds as the stable Latest release (v0.2.0-rc.3
+          # already ships as stable). A hardcoded true here demoted a manually promoted
+          # release back to prerelease on every Linux build, so keep it false.
+          prerelease: false
           fail_on_unmatched_files: true
           files: release-assets/*
           body: |
