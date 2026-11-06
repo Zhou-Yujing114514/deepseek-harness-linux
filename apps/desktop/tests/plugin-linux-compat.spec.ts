@@ -12,6 +12,7 @@ import {
   renderReport,
   resolveProfileDir,
 } from '../scripts/plugin-linux-compat.mjs'
+import type { PluginResult } from '../scripts/plugin-linux-compat.mjs'
 
 const x64 = TARGETS['linux-x64']
 
@@ -69,7 +70,7 @@ describe('manifest verdicts', () => {
   it('blocks a plugin declaring macOS/Windows only', () => {
     const result = inspectManifest({ name: 'mac-only', version: '1.0.0', os: ['darwin', 'win32'] }, x64, '22.19.0')
     expect(result.verdict).toBe('incompatible')
-    expect(result.findings[0].text).toContain('不包含 linux')
+    expect(result.findings[0]?.text).toContain('不包含 linux')
   })
 
   it('blocks a plugin pinned to the wrong architecture', () => {
@@ -79,13 +80,13 @@ describe('manifest verdicts', () => {
   it('blocks a plugin hard-depending on a Windows native binary', () => {
     const result = inspectManifest({ dependencies: { '@img/sharp-win32-x64': '0.35.5' } }, x64, '22.19.0')
     expect(result.verdict).toBe('incompatible')
-    expect(result.findings[0].text).toContain('硬依赖')
+    expect(result.findings[0]?.text).toContain('硬依赖')
   })
 
   it('blocks a plugin requiring a newer Node than the host', () => {
     const result = inspectManifest({ engines: { node: '>=24' } }, x64, '22.19.0')
     expect(result.verdict).toBe('incompatible')
-    expect(result.findings[0].text).toContain('Node >=24')
+    expect(result.findings[0]?.text).toContain('Node >=24')
   })
 
   it('does not fail on an unparseable engine range', () => {
@@ -100,7 +101,7 @@ describe('manifest verdicts', () => {
       },
     }, x64, '22.19.0')
     expect(result.verdict).toBe('unverified')
-    expect(result.findings[0].level).toBe('warn')
+    expect(result.findings[0]?.level).toBe('warn')
   })
 
   it('accepts a plugin that ships a linux x64 native variant', () => {
@@ -144,7 +145,7 @@ describe('profile inspection', () => {
     const results = await inspectProfile(dir, x64, '22.19.0')
     expect(results.map(entry => entry.name)).toEqual(['a', 'b', 'missing'])
     expect(results.map(entry => entry.verdict)).toEqual(['compatible', 'incompatible', 'unknown'])
-    expect(results[1].version).toBe('2.0.0')
+    expect(results[1]?.version).toBe('2.0.0')
   })
 
   it('treats a malformed installed manifest as unknown rather than throwing', async () => {
@@ -153,12 +154,12 @@ describe('profile inspection', () => {
     const target = join(dir, 'node_modules', 'broken')
     mkdirSync(target, { recursive: true })
     writeFileSync(join(target, 'package.json'), '{')
-    expect((await inspectProfile(dir, x64, '22.19.0'))[0].verdict).toBe('unknown')
+    expect((await inspectProfile(dir, x64, '22.19.0'))[0]?.verdict).toBe('unknown')
   })
 })
 
 describe('report rendering', () => {
-  const results = [
+  const results: PluginResult[] = [
     { name: 'good', version: '1.0.0', verdict: 'compatible', findings: [] },
     { name: 'bad', version: '2.0.0', verdict: 'incompatible', findings: [{ level: 'block', text: '声明 os=["darwin"]' }] },
   ]
