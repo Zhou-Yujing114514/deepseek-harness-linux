@@ -62,6 +62,41 @@ pnpm --dir apps/desktop run package:linux:arm64              # ARM64：AppImage 
 
 打包 AppImage 时构建机需要 FUSE 2（`libfuse2`）；`.deb` 打包需要 maintainer 字段（Linux 配置中已内置）。Linux 构建不做代码签名：自动更新走 `electron-updater` 的 AppImage 渠道，链路依赖 HTTPS 与 `nightly-linux.yml` 元数据、无签名校验，若要向第三方分发，这是需要评估的供应链环节。`.deb` 与 `.tar.gz` 作为同版本安装包一并发布。仓库内置 `Desktop (Linux)` 工作流可在原生双架构 runner 上一键构建。发布版本号、上传与各平台环境变量文件详见[桌面端打包说明](apps/desktop/README.md)。
 
+### 插件在 Linux 上的兼容性
+
+官方桌面端只发布 macOS / Windows，本仓库是在上游基础上做的 Linux 移植，**agent 内核与插件体系均来自上游、本仓库不做修改**。因此第三方插件默认按 win/mac 编写，在 Linux 上可能出现"装得上但用不了"，甚至完全不兼容。已知的三类边界：
+
+| 现象 | 原因 | 现状 |
+|---|---|---|
+| 插件装上后加载失败或静默失灵 | 插件声明 `os: ["darwin","win32"]`、只带 macOS 原生二进制、或要求更高的 Node 版本，而现有预检只校验 `engines.dsh` 与 peer 版本 | 用下面的诊断工具提前发现 |
+| 插件窗口"看得见但点不动" | 原生 Wayland 会话下，透明 / 置顶窗口无法由应用控制层叠与输入区域 | 用下面的兼容启动参数绕过 |
+| 读取本地图片时 Host 进程退出 | `sharp` / libvips 内嵌 glib 与 Electron 加载的系统 glib 冲突，进程内解码图片触发 SIGSEGV（[#24](https://github.com/Zhou-Yujing114514/deepseek-harness-linux/issues/24)） | 尚未修复，需独立 Node 运行 Host 并调整打包，属于待评估项 |
+
+**先诊断，再逐个排查。** 诊断工具只读插件的 `package.json`，不加载插件代码、不修改任何文件：
+
+```sh
+# 默认读取 $DSH_HOME/profiles/desktop；也可显式指定 profile 目录
+node apps/desktop/scripts/plugin-linux-compat.mjs
+node apps/desktop/scripts/plugin-linux-compat.mjs --profile /path/to/profiles/desktop --target linux-arm64
+node apps/desktop/scripts/plugin-linux-compat.mjs --json   # 输出结构化结果，便于脚本处理
+```
+
+`--profile` 指向的目录需包含 `package.json`（其 `dependencies` 列出已装插件）与对应的 `node_modules/`；还可用 `--target linux-x64|linux-arm64`、`--node <版本>` 指定目标平台与运行时。输出按"明确不兼容 / 需要人工确认 / 看起来可用"分组，并给出每条的原因。存在明确不兼容插件时退出码为 1。注意：**静态检查只能判断能否装上/加载，不能替代真机运行验证**。
+
+**Wayland 下插件窗口无法点击**时，用兼容参数走 XWayland 启动：
+
+```sh
+./deepseek-harness-0.2.1-rc.2-linux-x86_64.AppImage --ozone-platform=x11
+# 或让辅助脚本判断会话类型并给出建议
+node apps/desktop/scripts/linux-launch-compat.mjs ./deepseek-harness-0.2.1-rc.2-linux-x86_64.AppImage
+# 还要给 AppImage 传自己的参数时，必须用 -- 分隔，否则会被当成辅助脚本的选项而报 Unknown option
+node apps/desktop/scripts/linux-launch-compat.mjs ./deepseek-harness-0.2.1-rc.2-linux-x86_64.AppImage -- --enable-logging
+# 确认无误后真正启动；--exec 必须写在 -- 之前
+node apps/desktop/scripts/linux-launch-compat.mjs --exec ./deepseek-harness-0.2.1-rc.2-linux-x86_64.AppImage -- --enable-logging
+```
+
+辅助脚本默认只打印建议、不启动进程，加 `--exec` 才会真正带参数启动；`--exec` 与 `--` 的顺序不能颠倒，写反了 `--exec` 会被当成应用参数而不生效。代价是原生 Wayland 的分数缩放会失效（HiDPI 可能略模糊），且机器需装有 XWayland；因此**没有把它设为默认启动方式**。X11 会话无需此参数。
+
 ## 社区与支持
 
 - 通过 [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions) 提交反馈或 bug 报告。

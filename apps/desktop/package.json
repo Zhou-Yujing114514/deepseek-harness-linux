@@ -52,7 +52,8 @@
     "stage:selfhost:linux:x64": "node scripts/upload-selfhosted.mjs linux-x64 --stage-only",
     "stage:selfhost:linux:arm64": "node scripts/upload-selfhosted.mjs linux-arm64 --stage-only",
     "upload:selfhost:linux:x64": "node scripts/upload-selfhosted.mjs linux-x64 --prune --verify",
-    "upload:selfhost:linux:arm64": "node scripts/upload-selfhosted.mjs linux-arm64 --prune --verify"
+    "upload:selfhost:linux:arm64": "node scripts/upload-selfhosted.mjs linux-arm64 --prune --verify",
+    "upload:selfhost:index": "node scripts/upload-selfhosted.mjs index"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

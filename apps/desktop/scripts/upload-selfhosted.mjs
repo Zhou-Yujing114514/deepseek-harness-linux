@@ -514,6 +514,126 @@ export function parseManifestVersion(contents) {
   return value === '' ? undefined : value
 }
 
+/** Escape text before embedding it into the download page. */
+function escapeHtml(value) {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;').replaceAll("'", '&#39;')
+}
+
+/** Table rows in the order the hand-maintained page has always used. */
+const DOWNLOAD_ROWS = [
+  { format: 'AppImage', arch: 'x64', label: 'AppImage（通用，支持自动更新）（x64）' },
+  { format: 'AppImage', arch: 'arm64', label: 'AppImage（通用，支持自动更新）（arm64）' },
+  { format: 'deb', arch: 'x64', label: 'deb（Debian / Ubuntu）（x64）' },
+  { format: 'deb', arch: 'arm64', label: 'deb（Debian / Ubuntu）（arm64）' },
+  { format: 'tar.gz', arch: 'x64', label: 'tar.gz（免安装便携版）（x64）' },
+  { format: 'tar.gz', arch: 'arm64', label: 'tar.gz（免安装便携版）（arm64）' },
+]
+
+/** Update manifests the page links to; only ones actually present on the server are listed. */
+const UPDATE_MANIFESTS = [
+  'latest-linux-arm64.yml', 'latest-linux.yml',
+  'nightly-linux-arm64.yml', 'nightly-linux.yml',
+]
+
+/** Binary size rendered the same way the page has always shown it. */
+function megabytes(size) {
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+/**
+ * Render the download index from the files that actually exist on the server.
+ *
+ * The server keeps the previous release as a rollback target, so a directory listing
+ * can hold two versions at once. Only files of `version` are listed; everything else
+ * (old packages, .blockmap, checksums) is ignored. Sizes come from the listing, so the
+ * page can never advertise a size that disagrees with the published bytes.
+ *
+ * @param {string} version Version the feeds currently advertise.
+ * @param {Map<string, number>} listing Remote file name -> byte length.
+ * @returns {string} Complete index.html document.
+ */
+export function renderDownloadIndex(version, listing) {
+  const escaped = version.replaceAll('.', String.raw`\.`)
+  const pattern = new RegExp(`^deepseek-harness-${escaped}-linux-([A-Za-z0-9_]+)\\.(AppImage|deb|tar\\.gz)$`, 'u')
+  /** @type {Map<string, { name: string, size: number }>} */
+  const found = new Map()
+  for (const [name, size] of listing) {
+    const match = pattern.exec(name)
+    if (match === null) continue
+    const arch = ARCHITECTURE_SPELLINGS.get(match[1])
+    if (arch === undefined) continue
+    found.set(`${arch}|${match[2]}`, { name, size })
+  }
+
+  const rows = DOWNLOAD_ROWS.flatMap(({ format, arch, label }) => {
+    const item = found.get(`${arch}|${format}`)
+    if (item === undefined) return []
+    const safe = escapeHtml(item.name)
+    return [`      <tr><td>${label}</td><td><code>${safe}</code></td><td>${megabytes(item.size)}</td><td><a href="./${safe}">下载</a></td></tr>`]
+  })
+  const manifests = UPDATE_MANIFESTS.filter(name => listing.has(name))
+    .map(name => `  <li><code>${escapeHtml(name)}</code></li>`)
+  const appImage = found.get('x64|AppImage')
+  const deb = found.get('x64|deb')
+  const usage = []
+  if (appImage !== undefined) usage.push(`  <li><strong>AppImage</strong>：<code>chmod +x *.AppImage &amp;&amp; ./${escapeHtml(appImage.name)}</code></li>`)
+  if (deb !== undefined) usage.push(`  <li><strong>deb</strong>：<code>sudo apt install ./${escapeHtml(deb.name)}</code></li>`)
+  usage.push('  <li><strong>tar.gz</strong>：解压后运行其中的 <code>deepseek-harness</code></li>')
+  const safeVersion = escapeHtml(version)
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepSeek Harness 下载与更新源 · 四生万物工作室</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+         max-width: 860px; margin: 56px auto; padding: 0 20px; line-height: 1.75; color: #222; }
+  h1 { font-size: 22px; border-bottom: 2px solid #eee; padding-bottom: 12px; }
+  h2 { font-size: 17px; margin-top: 32px; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  th, td { border: 1px solid #e5e5e5; padding: 8px 10px; text-align: left; font-size: 14px; }
+  th { background: #fafafa; }
+  .note { background: #f9f9f9; border-left: 3px solid #888; padding: 10px 14px; margin: 20px 0; font-size: 14px; }
+  footer { margin-top: 40px; font-size: 13px; color: #888; border-top: 1px solid #eee; padding-top: 14px; }
+</style>
+</head>
+<body>
+<h1>DeepSeek Harness（Linux）下载与更新源</h1>
+<p>本目录为 <strong>DeepSeek Harness 桌面版 Linux 端</strong> 提供安装包与自动更新清单，由四生万物工作室维护。</p>
+
+<h2>安装包（${safeVersion}）</h2>
+<table>
+  <tr><th>格式</th><th>文件名</th><th>大小</th><th>链接</th></tr>
+${rows.join('\n')}
+</table>
+
+<h2>自动更新清单</h2>
+<ul>
+${manifests.join('\n')}
+</ul>
+<div class="note">
+当前声明版本：<strong>${safeVersion}</strong>。x64 客户端读取 <code>nightly-linux.yml</code>，
+arm64 客户端读取 <code>nightly-linux-arm64.yml</code>，两者互不冲突。
+</div>
+
+<h2>使用方式</h2>
+<ul>
+${usage.join('\n')}
+</ul>
+
+<footer>
+构建状态：<a href="./tasks/">查看构建与上传进度</a> · 由四生万物工作室维护<br>
+本页由发布流程根据服务器上的实际文件自动生成，请勿手工编辑。
+</footer>
+</body>
+</html>
+`
+}
+
 /**
  * Read the version the remote feed advertises right now.
  * @returns The published version, or undefined when no feed exists yet — the very first
@@ -647,8 +767,46 @@ export async function uploadSelfHostedTarget(argv) {
   process.stdout.write(`desktop self-hosted upload: ${target} ${version} is live at ${update.publicUrl}\n`)
 }
 
+/**
+ * Regenerate index.html from the files that are actually live on the server.
+ *
+ * This runs once, after both architectures have published: each target upload only
+ * knows its own three packages, so generating the page inside either one would show
+ * a half-filled table. Reading the remote directory also lets prune() keep a rollback
+ * release without that older version leaking onto the page.
+ *
+ * The version comes from the nightly feed because that is what an installed client
+ * reads by default; the latest feed is cross-checked so a page can never advertise a
+ * version that disagrees with one of the two channels.
+ * @param {string[]} argv Command-line arguments (currently none).
+ * @returns {Promise<void>}
+ */
+export async function publishDownloadIndex(argv) {
+  parseArgs({ args: argv, strict: true, allowPositionals: false })
+  const remoteRoot = resolveRemoteRoot()
+  const listing = await remoteListing(remoteRoot)
+  const version = await remotePublishedVersion(remoteRoot, 'nightly-linux.yml')
+  if (version === undefined || valid(version) === null) {
+    throw new Error('desktop self-hosted upload: cannot render index.html without the published feed version')
+  }
+  const latest = await remotePublishedVersion(remoteRoot, 'latest-linux.yml')
+  if (latest !== undefined && latest !== version) {
+    throw new Error(`desktop self-hosted upload: nightly feed says ${version} but latest feed says ${latest}; refusing to publish a contradictory index`)
+  }
+  const contents = renderDownloadIndex(version, listing)
+  const stage = join(dirname(resolve(import.meta.filename)), '..', '.desktop-build', 'index')
+  await rm(stage, { recursive: true, force: true })
+  await mkdir(stage, { recursive: true })
+  await writeFile(join(stage, 'index.html'), contents)
+  process.stdout.write(`desktop self-hosted upload: rendered index.html for ${version} (${listing.size} remote files)\n`)
+  const transport = await upload(stage, remoteRoot)
+  process.stdout.write(`desktop self-hosted upload: index.html ${transport} -> ${remoteRoot}\n`)
+}
+
 if (process.argv[1] !== undefined && import.meta.filename === resolve(process.argv[1])) {
-  uploadSelfHostedTarget(process.argv.slice(2)).catch(error => {
+  const argv = process.argv.slice(2)
+  const action = argv[0] === 'index' ? publishDownloadIndex(argv.slice(1)) : uploadSelfHostedTarget(argv)
+  action.catch(error => {
     process.stderr.write(`${redact(error instanceof Error ? error.message : String(error))}\n`)
     process.exitCode = 1
   })

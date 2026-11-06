@@ -52,6 +52,17 @@ env:
     apps/desktop/package.json
     .github/workflows/desktop-linux.yml
     .github/workflows/release-attach.yml
+    # Our dependabot config deliberately drops the uv updater for /python/sdk:
+    # its local editable path dependency cannot be resolved by Dependabot. Upstream
+    # may re-add that entry when merging, so keep our version on conflict.
+    .github/dependabot.yml
+    # Exact paths, not the whole tests/ directory: upstream owns the rest of the
+    # desktop tests and those must keep following upstream. These three cover
+    # fork-only features (self-hosted publishing, plugin compatibility diagnosis,
+    # and the optional Wayland launcher).
+    apps/desktop/tests/upload-selfhosted.spec.ts
+    apps/desktop/tests/plugin-linux-compat.spec.ts
+    apps/desktop/tests/linux-launch-compat.spec.ts
     .github/actions/prepare-linux-env/
     .github/actions/smoke-linux-appimage/
     README.md

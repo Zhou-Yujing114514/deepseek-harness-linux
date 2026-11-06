@@ -96,6 +96,13 @@ AppImage 通过 `electron-updater` 走 AppImage 更新通道，更新描述符�
 2. **Office 文档转换暂缺**：桌面内嵌的 DOCX / XLSX / PPTX → PDF 转换依赖 LibreOffice Kit 的 Linux 原生绑定，本版本尚未将其随包分发，该功能在 Linux 下暂不可用。其余桌面功能（agent、skill、联网、前端）均正常。
 3. **上游处于 developer preview**：官方迭代快、破坏性变更频繁，本项目会持续 rebase 上游提交。
 4. **无公证 / 无商店上架**：不走任何系统级公证或应用商店流程。
+5. **第三方插件在 Linux 上可能不兼容**：官方桌面端只发 macOS / Windows，插件默认按这两个平台编写；本仓库不修改上游的 agent 内核与插件体系。详见 [README.zh.md 的「插件在 Linux 上的兼容性」](README.zh.md#插件在-linux-上的兼容性)。使用前可先跑诊断：
+
+   ```sh
+   node apps/desktop/scripts/plugin-linux-compat.mjs --profile /path/to/profiles/desktop
+   ```
+
+   Wayland 下若插件窗口"看得见但点不动"，可用 `--ozone-platform=x11` 走 XWayland 启动（代价是失去原生 Wayland 分数缩放），也可让 `node apps/desktop/scripts/linux-launch-compat.mjs <AppImage>` 判断会话类型并给出建议；给应用自身传参数时用 `--` 分隔，`--exec` 必须写在 `--` 之前。读取本地图片导致 Host 退出的问题（[#24](https://github.com/Zhou-Yujing114514/deepseek-harness-linux/issues/24)）尚未修复，属待评估项。
 
 ## 与上游的关系
 

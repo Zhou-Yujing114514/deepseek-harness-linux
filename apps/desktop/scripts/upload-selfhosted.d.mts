@@ -37,6 +37,15 @@ export function parseEmbeddedBlockMap(tail: Buffer): number | undefined
 export function parseManifestVersion(contents: string): string | undefined
 
 /**
+ * Render the download page from the files that actually exist on the server.
+ * Only packages of `version` appear; rollback releases, block maps and checksums are ignored.
+ * @param version - Version the feeds currently advertise.
+ * @param listing - Remote file name -> byte length.
+ * @returns Complete index.html document.
+ */
+export function renderDownloadIndex(version: string, listing: Map<string, number>): string
+
+/**
  * Read the remote document root and refuse the values that would publish somewhere else.
  * @returns Absolute remote directory, without a trailing slash.
  */
@@ -62,3 +71,10 @@ export function upload(localDirectory: string, remoteRoot: string): Promise<stri
  * @param argv - Command arguments: one target name plus `--stage-only`, `--prune` and `--verify`.
  */
 export function uploadSelfHostedTarget(argv: string[]): Promise<void>
+
+/**
+ * Regenerate index.html from the live remote directory after both architectures publish.
+ * Reads the version from the nightly feed and refuses to publish if the latest feed disagrees.
+ * @param argv - Command arguments (currently none).
+ */
+export function publishDownloadIndex(argv: string[]): Promise<void>

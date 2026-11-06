@@ -11,6 +11,7 @@ import {
   parseManifestVersion,
   parseRemoteListing,
   redact,
+  renderDownloadIndex,
   resolveRemoteRoot,
 } from '../scripts/upload-selfhosted.mjs'
 
@@ -182,6 +183,88 @@ describe('parseEmbeddedBlockMap', () => {
     const buffer = tail(blockMap)
     buffer.writeUInt32BE(buffer.length, buffer.length - 4)
     expect(parseEmbeddedBlockMap(buffer)).toBeUndefined()
+  })
+})
+
+describe('generated download index', () => {
+  const version = '0.2.1-rc.2'
+  const listing = () => new Map<string, number>([
+    [`deepseek-harness-${version}-linux-x86_64.AppImage`, 362775034],
+    [`deepseek-harness-${version}-linux-arm64.AppImage`, 357639352],
+    [`deepseek-harness-${version}-linux-amd64.deb`, 285_999_104],
+    [`deepseek-harness-${version}-linux-arm64.deb`, 270_798_848],
+    [`deepseek-harness-${version}-linux-x64.tar.gz`, 349_970_432],
+    [`deepseek-harness-${version}-linux-arm64.tar.gz`, 343_146_496],
+    ['latest-linux.yml', 435],
+    ['latest-linux-arm64.yml', 433],
+    ['nightly-linux.yml', 435],
+    ['nightly-linux-arm64.yml', 433],
+  ])
+
+  it('renders all six packages with sizes taken from the listing', () => {
+    const html = renderDownloadIndex(version, listing())
+    for (const name of listing().keys()) {
+      if (name.endsWith('.yml')) continue
+      expect(html).toContain(name)
+      expect(html).toContain(`href="./${name}"`)
+    }
+    expect(html).toContain('346.0 MB')
+    expect(html).toContain('安装包（0.2.1-rc.2）')
+  })
+
+  it('never lists a retained rollback release', () => {
+    const files = listing()
+    files.set('deepseek-harness-0.2.0-rc.3-linux-x86_64.AppImage', 999_999_999)
+    files.set('deepseek-harness-0.2.0-rc.3-linux-amd64.deb', 999_999_999)
+    const html = renderDownloadIndex(version, files)
+    expect(html).not.toContain('0.2.0-rc.3')
+    expect(html).not.toContain('953.7 MB')
+  })
+
+  it('ignores block maps, checksums and unrelated files', () => {
+    const files = listing()
+    files.set(`deepseek-harness-${version}-linux-x86_64.AppImage.blockmap`, 377358)
+    files.set('SHA256SUMS.txt', 400)
+    files.set('index.html', 3723)
+    const html = renderDownloadIndex(version, files)
+    expect(html).not.toContain('.blockmap')
+    expect(html).not.toContain('SHA256SUMS.txt')
+    expect(html.match(/<tr>/g)?.length).toBe(7) // header row + six packages
+  })
+
+  it('only links update manifests that are present on the server', () => {
+    const files = new Map<string, number>([
+      [`deepseek-harness-${version}-linux-x86_64.AppImage`, 362775034],
+      ['nightly-linux.yml', 435],
+    ])
+    const html = renderDownloadIndex(version, files)
+    expect(html).toContain('nightly-linux.yml')
+    expect(html).not.toContain('latest-linux-arm64.yml')
+    expect(html.match(/<tr>/g)?.length).toBe(2) // header row + one package
+  })
+
+  it('escapes a crafted version instead of injecting markup', () => {
+    const injected = '1.0<img src=x onerror=alert(1)>'
+    const html = renderDownloadIndex(injected, new Map())
+    expect(html).not.toContain('<img src=x')
+    expect(html).toContain('&lt;img')
+  })
+
+  it('keeps usage instructions tied to the real x64 filenames', () => {
+    const html = renderDownloadIndex(version, listing())
+    expect(html).toContain(`./deepseek-harness-${version}-linux-x86_64.AppImage`)
+    expect(html).toContain(`sudo apt install ./deepseek-harness-${version}-linux-amd64.deb`)
+  })
+
+  it('states that the page is generated, not hand-edited', () => {
+    expect(renderDownloadIndex(version, listing())).toContain('自动生成')
+  })
+
+  it('renders a valid but empty table when nothing is live yet', () => {
+    const html = renderDownloadIndex(version, new Map())
+    expect(html).toContain('安装包（0.2.1-rc.2）')
+    expect(html.match(/<tr>/g)?.length).toBe(1) // header row only
+    expect(html).toContain('当前声明版本')
   })
 })
 

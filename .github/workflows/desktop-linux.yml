@@ -307,6 +307,11 @@ jobs:
         run: |
           pnpm --dir apps/desktop run upload:selfhost:linux:x64
           pnpm --dir apps/desktop run upload:selfhost:linux:arm64
+          # Generate index.html once, after both architectures are live. Each target
+          # upload only knows its own three packages, and reading the remote directory
+          # keeps a retained rollback release off the page. Sizes come from the server,
+          # so the page can never disagree with the published bytes.
+          pnpm --dir apps/desktop run upload:selfhost:index
 
   # A second distribution channel, not a second update channel. The client's baked-in
   # app-update.yml points at the self-hosted origin, so a GitHub release never competes with

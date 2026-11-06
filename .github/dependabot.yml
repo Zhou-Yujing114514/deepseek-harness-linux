@@ -16,17 +16,18 @@ updates:
       - "kind/dependency"
       - "area/infra"
 
-  - package-ecosystem: "uv"
-    directory: "/python/sdk"
-    schedule:
-      interval: "cron"
-      cronjob: "0 4 * * *"
-      timezone: "Asia/Shanghai"
-    cooldown:
-      default-days: 30
-    labels:
-      - "kind/dependency"
-      - "area/infra"
+  # Intentionally no `uv` updater for /python/sdk.
+  #
+  # python/sdk/pyproject.toml declares `deepseek-harness-runtime-bin==0.0.0.dev0`
+  # resolved through [tool.uv.sources] to the local editable path `../sdk-runtime`.
+  # Dependabot's uv backend ignores that sources mapping and looks the name up on
+  # PyPI, so every run fails with `dependency_file_not_resolvable` and the daily
+  # check goes red without ever producing a usable PR.
+  #
+  # More fundamentally the Python SDK is upstream-owned code: README states the
+  # agent core is taken from upstream unmodified, and sync-upstream.yml follows
+  # upstream for every path outside OURS_PATHS. Python dependency bumps belong to
+  # upstream, not to this Linux packaging fork. Keep npm and github-actions here.
 
   - package-ecosystem: "github-actions"
     directory: "/"
