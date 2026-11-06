@@ -120,7 +120,7 @@ jobs:
           test "${#archives[@]}" -eq 1
           pnpm exec tsx scripts/verify-ssh-helper-ssh.ts --archive="${archives[0]}" --report="dist-exe/ssh-helper/$HELPER_TARGET.ssh.json"
       - name: Upload verified archive and evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v6
         with:
           name: ssh-helper-${{ matrix.target }}
           path: dist-exe/ssh-helper/*
