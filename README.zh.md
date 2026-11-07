@@ -81,7 +81,9 @@ node apps/desktop/scripts/plugin-linux-compat.mjs --profile /path/to/profiles/de
 node apps/desktop/scripts/plugin-linux-compat.mjs --json   # 输出结构化结果，便于脚本处理
 ```
 
-`--profile` 指向的目录需包含 `package.json`（其 `dependencies` 列出已装插件）与对应的 `node_modules/`；还可用 `--target linux-x64|linux-arm64`、`--node <版本>` 指定目标平台与运行时。输出按"明确不兼容 / 需要人工确认 / 看起来可用"分组，并给出每条的原因。存在明确不兼容插件时退出码为 1。注意：**静态检查只能判断能否装上/加载，不能替代真机运行验证**。
+`--profile` 指向的目录需包含 `package.json`（其 `dependencies` / `optionalDependencies` 列出已装插件）与对应的 `node_modules/`；还可用 `--target linux-x64|linux-arm64`、`--node <版本>` 指定目标平台与运行时。输出按"明确不兼容 / 需要人工确认 / 看起来可用"分组，并给出每条的原因。存在明确不兼容插件时退出码为 1。
+
+全新的桌面 profile 通常只有 `dsh.profile.bundles`（应用自带的内置 bundle），`dependencies` 为空；这时报告会明确说明"没有第三方插件可诊断"并列出内置 bundle，**内置 bundle 不参与平台检查**，避免把空结果误读成扫描失败。第三方插件装进 profile 后才需要体检。注意：**静态检查只能判断能否装上/加载，不能替代真机运行验证**。
 
 **Wayland 下插件窗口无法点击**时，用兼容参数走 XWayland 启动：
 

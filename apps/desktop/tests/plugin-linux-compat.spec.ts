@@ -9,6 +9,7 @@ import {
   inspectProfile,
   matchesHostField,
   platformPackageHint,
+  readProfileDeclarations,
   renderReport,
   resolveProfileDir,
 } from '../scripts/plugin-linux-compat.mjs'
@@ -158,6 +159,58 @@ describe('profile inspection', () => {
   })
 })
 
+describe('profile declarations', () => {
+  const created: string[] = []
+  const profile = () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-compat-decl-'))
+    created.push(dir)
+    return dir
+  }
+
+  afterEach(() => {
+    for (const dir of created.splice(0)) rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('reads built-in bundles from a stock Desktop profile', async () => {
+    const dir = profile()
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      name: 'dsh-profile-desktop',
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'] } },
+    }))
+    const declarations = await readProfileDeclarations(dir)
+    expect(declarations.bundles).toEqual(['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
+    expect(declarations.names).toEqual([])
+  })
+
+  it('merges dependencies and optionalDependencies without duplicates', async () => {
+    const dir = profile()
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { a: '1.0.0', shared: '1.0.0' },
+      optionalDependencies: { shared: '1.0.0', c: '1.0.0' },
+    }))
+    const declarations = await readProfileDeclarations(dir)
+    expect(declarations.names).toEqual(['a', 'shared', 'c'])
+    expect(declarations.bundles).toEqual([])
+  })
+
+  it('ignores a malformed dsh block', async () => {
+    const dir = profile()
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ dsh: 'not-an-object', dependencies: {} }))
+    expect(await readProfileDeclarations(dir)).toEqual({ bundles: [], names: [] })
+  })
+
+  it('returns no results for a bundle-only profile', async () => {
+    const dir = profile()
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      dependencies: {},
+      dsh: { profile: { bundles: ['@deepseek-ai/dsh-base'] } },
+    }))
+    expect(await inspectProfile(dir, x64, '22.19.0')).toEqual([])
+  })
+})
+
 describe('report rendering', () => {
   const results: PluginResult[] = [
     { name: 'good', version: '1.0.0', verdict: 'compatible', findings: [] },
@@ -175,6 +228,21 @@ describe('report rendering', () => {
 
   it('does not claim a real runtime test was performed', () => {
     expect(renderReport(results, options)).toContain('不能替代真机运行验证')
+  })
+
+  it('explains an empty stock profile instead of looking like a failed scan', () => {
+    const report = renderReport([], {
+      ...options,
+      bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
+    })
+    expect(report).toContain('没有第三方插件')
+    expect(report).toContain('内置 bundle')
+    expect(report).toContain('@deepseek-ai/dsh-base、@deepseek-ai/dsh-web-app')
+    expect(report).toContain('重新运行本工具')
+  })
+
+  it('keeps the empty-profile note out of a populated report', () => {
+    expect(renderReport(results, options)).not.toContain('没有第三方插件')
   })
 })
 

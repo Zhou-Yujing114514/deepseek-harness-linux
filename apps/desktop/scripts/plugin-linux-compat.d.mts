@@ -73,8 +73,21 @@ export interface PluginResult {
  */
 export function renderReport(
   results: readonly PluginResult[],
-  options: { target: string; node?: string; profile: string },
+  options: { target: string; node?: string; profile: string; bundles?: readonly string[] },
 ): string
+
+/** What a Desktop profile declares before any plugin is loaded. */
+export interface ProfileDeclarations {
+  bundles: string[]
+  names: string[]
+}
+
+/**
+ * Read a Desktop profile's built-in bundles and third-party dependency names.
+ * Bundles come from `dsh.profile.bundles`; names are the deduplicated union of
+ * `dependencies` and `optionalDependencies`. Never loads plugin code.
+ */
+export function readProfileDeclarations(profileDir: string): Promise<ProfileDeclarations>
 
 /**
  * Read the plugins a Desktop profile declares, then inspect each installed manifest.

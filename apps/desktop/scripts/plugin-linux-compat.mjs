@@ -145,7 +145,7 @@ const LABELS = {
 /**
  * Render a plain-text Chinese report.
  * @param {Array<{ name: string, version: string, verdict: string, findings: Finding[] }>} results
- * @param {{ target: string, node?: string, profile: string }} options
+ * @param {{ target: string, node?: string, profile: string, bundles?: readonly string[] }} options
  * @returns {string}
  */
 export function renderReport(results, options) {
@@ -160,6 +160,18 @@ export function renderReport(results, options) {
     + `${counts.incompatible} 个明确不兼容，${counts.unverified} 个需要人工确认`
     + `${counts.unknown > 0 ? `，${counts.unknown} 个无法读取` : ''}`)
   lines.push('')
+  // A stock Desktop profile declares only built-in bundles in dsh.profile.bundles and
+  // leaves dependencies empty. Reporting "0 plugins" without context reads like the
+  // tool failed to scan, so spell out the difference between "no third-party plugins"
+  // and "nothing could be inspected".
+  if (results.length === 0) {
+    lines.push('该 profile 的 dependencies / optionalDependencies 里没有第三方插件，因此没有可诊断的对象。')
+    if (options.bundles !== undefined && options.bundles.length > 0) {
+      lines.push(`内置 bundle（应用自带，不参与平台检查）：${options.bundles.join('、')}`)
+    }
+    lines.push('第三方插件装进 profile 后会写进 dependencies，届时重新运行本工具即可。')
+    lines.push('')
+  }
   for (const verdict of ['incompatible', 'unverified', 'unknown', 'compatible']) {
     const group = results.filter(result => result.verdict === verdict)
     if (group.length === 0) continue
@@ -181,6 +193,29 @@ export function renderReport(results, options) {
 }
 
 /**
+ * Read what a Desktop profile declares, without loading any plugin code.
+ *
+ * Third-party plugins live in `dependencies` (and sometimes `optionalDependencies`)
+ * with a matching node_modules entry. `dsh.profile.bundles` instead names built-in
+ * bundles shipped inside the app; they are reported for context but never diagnosed.
+ * @param {string} profileDir Profile directory holding package.json.
+ * @returns {Promise<{ bundles: string[], names: string[] }>}
+ */
+export async function readProfileDeclarations(profileDir) {
+  const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
+  if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    return { bundles: [], names: [] }
+  }
+  const dsh = own(manifest, 'dsh')
+  const profile = dsh !== null && typeof dsh === 'object' && !Array.isArray(dsh)
+    && Object.hasOwn(dsh, 'profile') ? dsh.profile : undefined
+  const bundles = profile !== null && typeof profile === 'object' && !Array.isArray(profile)
+    && Array.isArray(profile.bundles) ? profile.bundles.filter(name => typeof name === 'string') : []
+  const names = [...new Set([...ownKeys(manifest, 'dependencies'), ...ownKeys(manifest, 'optionalDependencies')])]
+  return { bundles, names }
+}
+
+/**
  * Read the plugins a Desktop profile declares, then inspect each installed manifest.
  * @param {string} profileDir Profile directory holding package.json and node_modules.
  * @param {{ platform: string, arch: string, libc: string }} target Host target.
@@ -188,8 +223,7 @@ export function renderReport(results, options) {
  * @returns {Promise<Array<{ name: string, version: string, verdict: string, findings: Finding[] }>>}
  */
 export async function inspectProfile(profileDir, target, runtimeNode) {
-  const manifest = JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
-  const names = Object.keys(manifest.dependencies ?? {})
+  const { names } = await readProfileDeclarations(profileDir)
   const results = []
   for (const name of names) {
     let pkg
@@ -239,6 +273,8 @@ export async function main(argv) {
       '  --help            显示本说明',
       '',
       '只读插件的 package.json，不加载插件代码，不修改任何文件。',
+      '只诊断 dependencies / optionalDependencies 里的第三方插件；',
+      'dsh.profile.bundles 里的内置 bundle 仅在报告中列出，不参与平台检查。',
       '',
     ].join('\n'))
     return
@@ -249,11 +285,12 @@ export async function main(argv) {
   }
   const profile = resolveProfileDir(values.profile)
   const runtimeNode = values.node ?? process.versions.node
+  const { bundles } = await readProfileDeclarations(profile)
   const results = await inspectProfile(profile, TARGETS[targetName], runtimeNode)
   if (values.json === true) {
-    process.stdout.write(`${JSON.stringify({ profile, target: targetName, node: runtimeNode, results }, null, 2)}\n`)
+    process.stdout.write(`${JSON.stringify({ profile, target: targetName, node: runtimeNode, bundles, results }, null, 2)}\n`)
   } else {
-    process.stdout.write(renderReport(results, { target: targetName, node: runtimeNode, profile }))
+    process.stdout.write(renderReport(results, { target: targetName, node: runtimeNode, profile, bundles }))
   }
   if (results.some(result => result.verdict === 'incompatible')) process.exitCode = 1
 }
