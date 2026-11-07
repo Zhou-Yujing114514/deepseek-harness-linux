@@ -5,7 +5,7 @@ import { SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { SESSION_SEARCH_RESULT_LIMIT } from '../../types.ts'
-import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
+import type { SessionProjectionSummaryValues } from '@deepseek-ai/dsh-session-projection/types'
 import {
   createSnapshotStore, notifySubscribers, type ObservableSnapshot, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-store'
@@ -43,14 +43,18 @@ export interface SessionSummary {
   /**
    * New Session presentation and reuse eligibility, derived from the Host
    * summary, `sessionListMetadata`, and client acceptance/running observations.
-   * Workspace reconnection may reuse a blank in the same workspace. Filtering
+   * New Session and Workspace reconnection may reuse a blank in the same workspace. Filtering
    * stays with the consumer: the store carries every row, while the Workspace
    * browser shows only the selected blank entry.
    */
   blank: boolean
   updatedAt: number
-  /** Current host-computed projection values retained by the object layer. */
-  projectionValues?: Readonly<Partial<SessionProjectionMap>>
+  /**
+   * The row's summary projection values retained by the object layer, never the
+   * full projection set. A connected Session's store may hold more values from
+   * its control/follow baseline; those are outside the list contract.
+   */
+  projectionValues?: Readonly<Partial<SessionProjectionSummaryValues>>
 }
 
 /** Catalog metadata and local source counts; catalog membership owns no Client generation. */
@@ -126,12 +130,24 @@ function displayTitleOf(title: string | undefined, cwd: string | undefined, id: 
 }
 
 /**
- * Increment a trailing fork number while preserving its half-width or
- * full-width parentheses; an unnumbered title starts with ` (1)`.
+ * Increment the fork number until the candidate is not taken.
  * @param title - source session's durable title.
+ * @param taken - durable titles of Host-listed sessions.
  * @returns the title assigned to the fork child.
  */
-function increasedForkTitle(title: string): string {
+function increasedForkTitle(title: string, taken: ReadonlySet<string>): string {
+  let next = incrementedTitle(title)
+  while (taken.has(next)) next = incrementedTitle(next)
+  return next
+}
+
+/**
+ * Increment a trailing fork number while preserving its half-width or
+ * full-width parentheses; an unnumbered title starts with ` (1)`.
+ * @param title - title to increment.
+ * @returns the title with the next fork number.
+ */
+function incrementedTitle(title: string): string {
   const ascii = /^(.*?)\((\d+)\)$/u.exec(title)
   if (ascii?.[1] !== undefined && ascii[2] !== undefined) {
     return `${ascii[1]}(${BigInt(ascii[2]) + 1n})`
@@ -451,7 +467,8 @@ export class ClientSessions implements ISessions {
    *   seq (a real event seq the caller already knows; a cut inside an open
    *   turn is balanced Host-side with synthetic closers, and omission selects
    *   the latest completed-turn prefix), and whether to increment an
-   *   inherited durable title before resolving, plus permission to start source migration.
+   *   inherited durable title, skipping numbers Host-listed titles already use,
+   *   before resolving, plus permission to start source migration.
    * @returns the child session id.
    * @throws {SessionForkError} with the source id.
    * @throws {Error} when a requested child-title rename fails after creation.
@@ -476,7 +493,9 @@ export class ClientSessions implements ISessions {
     const childId = result.value.sessionId
     opts.onCreated?.(childId)
     if (sourceTitle !== undefined) {
-      const renamed = await this.manager.rename(childId, increasedForkTitle(sourceTitle))
+      const list = this.list.getSnapshot()
+      const taken = new Set(list.ids.flatMap(id => list.byId[id]?.title ?? []))
+      const renamed = await this.manager.rename(childId, increasedForkTitle(sourceTitle, taken))
       if (!renamed.ok) throw new Error(`fork child rename failed: ${renamed.error.code}: ${renamed.error.message}`)
     }
     return childId

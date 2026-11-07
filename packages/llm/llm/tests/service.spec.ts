@@ -239,8 +239,13 @@ describe('LlmRuntime', () => {
         tools: [search],
         toolHistory: { tools: [], updates: [{ messageId: added.id, additions: [search] }] },
       }))
-      expect(adapter.lastOptions?.tools).toEqual([{ ...search, deferLoading: true }])
-      expect(adapter.lastOptions?.messages).toEqual([added])
+      if (mode === 'in-history') {
+        expect(adapter.lastOptions?.tools).toEqual([{ ...search, deferLoading: true }])
+        expect(adapter.lastOptions?.messages).toEqual([added])
+      } else {
+        expect(adapter.lastOptions?.tools).toEqual([search])
+        expect(adapter.lastOptions?.messages).toEqual([])
+      }
 
       const afterRemoval = await ctx.llm.prepareCall({ provider: 'test-provider', model: 'test-model' })
       await collect(afterRemoval.stream({
@@ -694,6 +699,22 @@ describe('LlmRuntime', () => {
     await expect(ctx.llm.listModels('catalog')).resolves.toEqual([{
       provider: 'catalog', id: 'fast', name: 'source mutated', description: 'Low latency', inputModalities: ['text'],
     }])
+  })
+
+  it('detaches advertised model badges, including their translations', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    const translated = { text: { en: 'New', zh: '新' }, tone: 'info' as const }
+    const literal = { text: '1017', tone: 'neutral' as const }
+    ctx.llm.registerAdapter(['catalog'], new CatalogAdapter({ id: 'catalog', name: 'Catalog' }, [
+      { provider: 'catalog', id: 'new', name: 'New', badge: translated },
+      { provider: 'catalog', id: 'dated', name: 'Dated', badge: literal },
+    ]))
+    const [first, second] = await ctx.llm.listModels('catalog')
+    expect(first?.badge).toEqual(translated)
+    expect(first?.badge).not.toBe(translated)
+    expect(first?.badge?.text).not.toBe(translated.text)
+    expect(second?.badge).toEqual(literal)
   })
 
   it('defaults adapters to their route name and an empty advisory model list', async () => {

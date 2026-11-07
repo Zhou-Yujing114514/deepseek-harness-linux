@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { connectDesktopWelcome } from '../../desktop/src/welcome-backend.ts'
+import { authenticateWebHost } from '../../desktop/src/web-document.ts'
 import { chromium, type Browser, type Page } from 'playwright'
 import { afterEach, beforeEach, describe, expect, it, onTestFailed } from 'vitest'
 import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
@@ -19,6 +20,7 @@ const MODE = webSnapshotMode()
 const EXPECTED = fileURLToPath(new URL('./expected/desktop-onboarding', import.meta.url))
 const NS = 'ui-settings-account'
 const INITIAL = { version: 1, step: 'welcome', purpose: null, process: null, completion: null, usage: 'compact', developerTools: false }
+const ACCOUNT_ASSET = /\/plugins\/@deepseek-ai\/dsh-client-ui-settings-account\/assets\/onboarding-[a-z-]+-[0-9a-f]{12}\.(?:svg|webp)$/
 
 describe.skipIf(MODE === 'record')('web e2e: App-only desktop onboarding', () => {
   let root: string
@@ -106,7 +108,7 @@ describe.skipIf(MODE === 'record')('web e2e: App-only desktop onboarding', () =>
 
   async function desktopPage(locale = ZH_BROWSER_LOCALE): Promise<Page> {
     const opened = await browser.newPage({ viewport: { width: 1280, height: 840 }, locale, reducedMotion: 'reduce' })
-    const welcome = await connectDesktopWelcome(scaffold.authenticatedUrl, (input, init) => scaffold.hostFetch(input, init))
+    const welcome = connectDesktopWelcome(scaffold.baseUrl, await authenticateWebHost(scaffold.authenticatedUrl))
     await opened.exposeFunction('__onboardingHasApiKey', async () => (await welcome.read()).hasApiKey)
     await opened.addInitScript(() => {
       Object.defineProperty(globalThis, 'dshOnboarding', { value: {
@@ -124,15 +126,18 @@ describe.skipIf(MODE === 'record')('web e2e: App-only desktop onboarding', () =>
   async function snapshot(name: string): Promise<void> {
     await expect.poll(() => page.locator('[data-desktop-onboarding]').getAttribute('aria-busy')).toBe('false')
     const hasIllustration = name.startsWith('welcome') || name.startsWith('credit')
-    if (hasIllustration) {
-      const decoded = await page.locator('[class*="illustration"] > img').evaluateAll(async elements =>
-        Promise.all(elements.map(async (element) => {
-          const image = element as HTMLImageElement
-          await image.decode()
-          return image.naturalWidth > 0 && image.naturalHeight > 0
-        })))
-      expect(decoded).toEqual([true, true])
-    }
+    // Illustrations and card icons are package assets fetched after the step renders.
+    const images = await page.locator('[data-desktop-onboarding] img').evaluateAll(async elements =>
+      Promise.all(elements.map(async (element) => {
+        const image = element as HTMLImageElement
+        await image.decode()
+        return {
+          source: image.currentSrc, illustration: image.matches('[class*="illustration"] > img'),
+          loaded: image.naturalWidth > 0 && image.naturalHeight > 0,
+        }
+      })))
+    expect(images.filter(image => !image.loaded || !ACCOUNT_ASSET.test(image.source)), `${name}: images outside loaded package assets`).toEqual([])
+    expect(images.filter(image => image.illustration), `${name}: illustration images`).toHaveLength(hasIllustration ? 2 : 0)
     const aria = await captureStableAria(page, '[data-desktop-onboarding]', scaffold.workspaceCwd)
     await mkdir(EXPECTED, { recursive: true })
     await compareOrRefreshGolden(join(EXPECTED, `${name}.expected.md`), aria, MODE)
@@ -424,7 +429,8 @@ describe.skipIf(MODE === 'record')('web e2e: App-only desktop onboarding', () =>
     expect(await page.getByRole('button', { name: 'Next', exact: true })
       .evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(72, 73, 76)')
     await snapshot('credit-en-dark')
-    expect(await page.locator('[class*="backIcon"]').evaluate(element => getComputedStyle(element).maskImage)).toContain('data:image/svg+xml')
+    expect(await page.locator('[class*="backIcon"]').evaluate(element => getComputedStyle(element).maskImage))
+      .toMatch(/^url\("[^"]*\/plugins\/@deepseek-ai\/dsh-client-ui-settings-account\/assets\/onboarding-back-[0-9a-f]{12}\.svg"\)$/)
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     await page.getByRole('button', { name: 'Got it', exact: true }).click()
     await page.getByRole('checkbox', { name: 'Coding & development', exact: true }).locator('..').click()

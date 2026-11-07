@@ -177,3 +177,40 @@ it.each([
     expect((await screen.findByRole('tooltip')).textContent).toBe(label)
   } finally { f.view.unmount(); f.status.resolve({ phase: 'idle' }) }
 })
+
+it('localizes fullscreen timeout guidance and preserves the retry action', async () => {
+  const f = fixture()
+  const copy: string[] = []
+  try {
+    await f.emit({ phase: 'error', failure: 'fullscreen-timeout', version: available.version })
+    for (const dictionary of [zh, en]) {
+      f.view.rerender(<f.Indicator dictionary={dictionary} />)
+      fireEvent.focus(screen.getByRole('button'))
+      copy.push((await screen.findByRole('tooltip')).textContent ?? '')
+    }
+    expect(copy).toMatchInlineSnapshot(`
+      [
+        "无法退出全屏，请退出全屏后重试更新",
+        "Could not exit fullscreen. Exit fullscreen, then retry the update.",
+      ]
+    `)
+    fireEvent.click(screen.getByRole('button'))
+    expect(f.open).toHaveBeenCalledOnce()
+  } finally { f.view.unmount(); f.status.resolve(available) }
+})
+
+
+it('keeps a configuration error actionable while download progress continues', async () => {
+  const f = fixture()
+  await f.emit({ phase: 'idle', configurationError: 'format' })
+  const error = screen.getByRole('button', { name: '配置不可用' })
+  fireEvent.click(error)
+  await act(async () => {})
+  expect(f.open).toHaveBeenCalledOnce()
+  await f.emit({ phase: 'downloading', percent: 58, configurationError: 'cleanup' })
+  fireEvent.click(screen.getByRole('button', { name: '配置不可用' }))
+  await act(async () => {})
+  expect(f.open).toHaveBeenCalledTimes(2)
+  f.view.unmount()
+  f.status.resolve({ phase: 'idle' })
+})
