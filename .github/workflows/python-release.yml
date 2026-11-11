@@ -175,7 +175,7 @@ jobs:
           sha256sum *.whl | sort -k2 > SHA256SUMS
           cat SHA256SUMS
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v6
         with:
           name: python-release-${{ steps.version.outputs.version }}
           path: dist/*

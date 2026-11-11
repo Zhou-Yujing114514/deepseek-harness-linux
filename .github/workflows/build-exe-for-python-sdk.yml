@@ -145,7 +145,7 @@ jobs:
           --package sdk
           --output-dir dist-python
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v6
         with:
           name: deepseek_harness_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
           path: dist-python/deepseek_harness_sdk-${{ needs.plan.outputs.version }}-py3-none-any.whl
@@ -504,7 +504,7 @@ jobs:
             env -u PYTHONPATH -u DSH_RUNTIME_MODE /tmp/dsh-sdk/bin/python /work/scripts/smoke-python-runtime.py --scenario sdk-mcp --installed-wheel
           '
 
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.runtime-posix.outputs.wheel || steps.runtime-windows.outputs.wheel }}
           path: dist-python/${{ steps.runtime-posix.outputs.wheel || steps.runtime-windows.outputs.wheel }}
