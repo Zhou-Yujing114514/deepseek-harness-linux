@@ -7,9 +7,11 @@ import { deflateRawSync, gzipSync } from 'node:zlib'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   channelManifest,
+  missingDownloadPackages,
   parseEmbeddedBlockMap,
   parseManifestVersion,
   parseRemoteListing,
+  reconcileFeedVersions,
   redact,
   renderDownloadIndex,
   resolveRemoteRoot,
@@ -265,6 +267,104 @@ describe('generated download index', () => {
     expect(html).toContain('安装包（0.2.1-rc.2）')
     expect(html.match(/<tr>/g)?.length).toBe(1) // header row only
     expect(html).toContain('当前声明版本')
+  })
+})
+
+describe('index feed reconciliation', () => {
+  const version = '0.2.2-rc.1'
+  const allFeeds = (v: string) => ({
+    'nightly-linux.yml': v,
+    'latest-linux.yml': v,
+    'nightly-linux-arm64.yml': v,
+    'latest-linux-arm64.yml': v,
+  })
+
+  it('accepts four feeds that all advertise the same version', () => {
+    expect(reconcileFeedVersions(allFeeds(version))).toBe(version)
+  })
+
+  it('rejects an arm64 nightly feed left on the previous version', () => {
+    const feeds = allFeeds(version)
+    feeds['nightly-linux-arm64.yml'] = '0.2.1-rc.2'
+    expect(() => reconcileFeedVersions(feeds)).toThrow(/nightly-linux-arm64\.yml says 0\.2\.1-rc\.2/)
+  })
+
+  it('rejects an arm64 latest feed left on the previous version', () => {
+    const feeds = allFeeds(version)
+    feeds['latest-linux-arm64.yml'] = '0.2.1-rc.2'
+    expect(() => reconcileFeedVersions(feeds)).toThrow(/latest-linux-arm64\.yml says 0\.2\.1-rc\.2/)
+  })
+
+  it('still rejects a disagreeing x64 latest feed', () => {
+    const feeds = allFeeds(version)
+    feeds['latest-linux.yml'] = '0.2.1-rc.2'
+    expect(() => reconcileFeedVersions(feeds)).toThrow(/latest-linux\.yml says 0\.2\.1-rc\.2/)
+  })
+
+  it('reports every disagreeing feed in one message', () => {
+    const feeds = allFeeds(version)
+    feeds['latest-linux.yml'] = '0.9.0'
+    feeds['nightly-linux-arm64.yml'] = '0.8.0'
+    expect(() => reconcileFeedVersions(feeds)).toThrow(/latest-linux\.yml says 0\.9\.0.*nightly-linux-arm64\.yml says 0\.8\.0/)
+  })
+
+  it('tolerates feeds that are not live yet', () => {
+    const feeds: Record<string, string | undefined> = {
+      'nightly-linux.yml': version,
+      'latest-linux.yml': undefined,
+      'nightly-linux-arm64.yml': undefined,
+      'latest-linux-arm64.yml': undefined,
+    }
+    expect(reconcileFeedVersions(feeds)).toBe(version)
+  })
+
+  it('rejects a missing or invalid x64 nightly feed', () => {
+    expect(() => reconcileFeedVersions({ 'nightly-linux.yml': undefined })).toThrow(/cannot render index\.html/)
+    const invalid: Record<string, string | undefined> = { 'nightly-linux.yml': 'not-a-version' }
+    expect(() => reconcileFeedVersions(invalid)).toThrow(/cannot render index\.html/)
+  })
+})
+
+describe('index package completeness', () => {
+  const version = '0.2.2-rc.1'
+  const complete = () => new Map<string, number>([
+    [`deepseek-harness-${version}-linux-x86_64.AppImage`, 1],
+    [`deepseek-harness-${version}-linux-arm64.AppImage`, 1],
+    [`deepseek-harness-${version}-linux-amd64.deb`, 1],
+    [`deepseek-harness-${version}-linux-arm64.deb`, 1],
+    [`deepseek-harness-${version}-linux-x64.tar.gz`, 1],
+    [`deepseek-harness-${version}-linux-arm64.tar.gz`, 1],
+  ])
+
+  it('reports nothing missing when all six packages are live', () => {
+    expect(missingDownloadPackages(version, complete())).toEqual([])
+  })
+
+  it('reports the arm64 packages missing after a cancelled publish', () => {
+    const files = complete()
+    files.delete(`deepseek-harness-${version}-linux-arm64.AppImage`)
+    files.delete(`deepseek-harness-${version}-linux-arm64.deb`)
+    files.delete(`deepseek-harness-${version}-linux-arm64.tar.gz`)
+    expect(missingDownloadPackages(version, files)).toEqual([
+      'arm64 AppImage', 'arm64 deb', 'arm64 tar.gz',
+    ])
+  })
+
+  it('ignores packages of a retained rollback release', () => {
+    const files = complete()
+    files.set('deepseek-harness-0.2.1-rc.2-linux-arm64.AppImage', 1)
+    expect(missingDownloadPackages(version, files)).toEqual([])
+  })
+
+  it('ignores block maps, checksums and unrelated files', () => {
+    const files = complete()
+    files.set(`deepseek-harness-${version}-linux-x86_64.AppImage.blockmap`, 1)
+    files.set('SHA256SUMS.txt', 1)
+    expect(missingDownloadPackages(version, files)).toEqual([])
+  })
+
+  it('lists all six as missing when nothing is live yet', () => {
+    expect(missingDownloadPackages(version, new Map())).toHaveLength(6)
   })
 })
 

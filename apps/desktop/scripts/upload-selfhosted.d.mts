@@ -46,6 +46,26 @@ export function parseManifestVersion(contents: string): string | undefined
 export function renderDownloadIndex(version: string, listing: Map<string, number>): string
 
 /**
+ * Cross-check the version advertised by every channel feed (nightly/latest for
+ * x64 and arm64) before rendering the download page. The x64 nightly feed is
+ * authoritative; missing feeds are tolerated, but any live feed that disagrees
+ * makes the page contradictory and is rejected.
+ * @param versions - Feed file name -> advertised version (undefined when absent).
+ * @returns The one version every live feed agrees on.
+ * @throws When the nightly feed is missing/invalid or a feed disagrees.
+ */
+export function reconcileFeedVersions(versions: Record<string, string | undefined>): string
+
+/**
+ * Find packages of `version` missing from the remote directory. A publish
+ * cancelled halfway can leave only some of the six packages live.
+ * @param version - Version the feeds advertise.
+ * @param listing - Remote file name -> byte length.
+ * @returns "arch format" labels for the missing packages (empty when complete).
+ */
+export function missingDownloadPackages(version: string, listing: Map<string, number>): string[]
+
+/**
  * Read the remote document root and refuse the values that would publish somewhere else.
  * @returns Absolute remote directory, without a trailing slash.
  */
@@ -74,7 +94,9 @@ export function uploadSelfHostedTarget(argv: string[]): Promise<void>
 
 /**
  * Regenerate index.html from the live remote directory after both architectures publish.
- * Reads the version from the nightly feed and refuses to publish if the latest feed disagrees.
+ * Reads the version from the x64 nightly feed and cross-checks all four feeds
+ * (nightly/latest for x64 and arm64), refusing to publish a contradictory page.
+ * Warns when some of the six packages of that version are missing.
  * @param argv - Command arguments (currently none).
  */
 export function publishDownloadIndex(argv: string[]): Promise<void>

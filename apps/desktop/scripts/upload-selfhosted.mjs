@@ -634,6 +634,73 @@ ${usage.join('\n')}
 `
 }
 
+/** Feeds an installed client can read. x64 has no suffix; arm64 feeds are suffixed. */
+const INDEX_FEEDS = [
+  'nightly-linux.yml', 'latest-linux.yml',
+  'nightly-linux-arm64.yml', 'latest-linux-arm64.yml',
+]
+
+/**
+ * Cross-check the version advertised by every channel feed before rendering the page.
+ *
+ * The download page declares a single version for both architectures. A publish that
+ * is interrupted halfway (for example x64 finishes but arm64 is cancelled) can leave
+ * the arm64 feeds pointing at the previous version while the x64 feeds already carry
+ * the new one. Rendering then produces a page that contradicts what arm64 clients
+ * actually read, so refuse it. The x64 nightly feed is authoritative because that is
+ * what an installed client reads by default.
+ *
+ * Missing feeds are tolerated: the first publish, or one that has not shipped an
+ * architecture yet, legitimately has nothing to compare. Every feed that does exist
+ * must agree.
+ *
+ * @param {Record<string, string | undefined>} versions Feed file name -> advertised version.
+ * @returns {string} The one version every live feed agrees on.
+ */
+export function reconcileFeedVersions(versions) {
+  const primary = versions['nightly-linux.yml']
+  if (primary === undefined || valid(primary) === null) {
+    throw new Error('desktop self-hosted upload: cannot render index.html without the published nightly feed version')
+  }
+  /** @type {string[]} */
+  const conflicts = []
+  for (const name of INDEX_FEEDS) {
+    const version = versions[name]
+    if (name === 'nightly-linux.yml' || version === undefined) continue
+    if (version !== primary) conflicts.push(`${name} says ${version}`)
+  }
+  if (conflicts.length > 0) {
+    throw new Error(`desktop self-hosted upload: feeds disagree with nightly-linux.yml (${primary}): ${conflicts.join(', ')}; refusing to publish a contradictory index`)
+  }
+  return primary
+}
+
+/**
+ * Find packages of `version` that are missing from the remote directory.
+ *
+ * Each architecture ships three formats. A publish cancelled midway can leave only
+ * some of them live, and renderDownloadIndex() would then quietly emit a page with a
+ * half-filled table. This keeps an incomplete publish from replacing a good page.
+ *
+ * @param {string} version Version the feeds advertise.
+ * @param {Map<string, number>} listing Remote file name -> byte length.
+ * @returns {string[]} Human-readable "arch format" labels for the missing packages.
+ */
+export function missingDownloadPackages(version, listing) {
+  const escaped = version.replaceAll('.', String.raw`\.`)
+  const pattern = new RegExp(`^deepseek-harness-${escaped}-linux-([A-Za-z0-9_]+)\\.(AppImage|deb|tar\\.gz)$`, 'u')
+  /** @type {Set<string>} */
+  const present = new Set()
+  for (const name of listing.keys()) {
+    const match = pattern.exec(name)
+    if (match === null) continue
+    const arch = ARCHITECTURE_SPELLINGS.get(match[1])
+    if (arch !== undefined) present.add(`${arch}|${match[2]}`)
+  }
+  return DOWNLOAD_ROWS.filter(row => !present.has(`${row.arch}|${row.format}`))
+    .map(row => `${row.arch} ${row.format}`)
+}
+
 /**
  * Read the version the remote feed advertises right now.
  * @returns The published version, or undefined when no feed exists yet — the very first
@@ -775,9 +842,11 @@ export async function uploadSelfHostedTarget(argv) {
  * a half-filled table. Reading the remote directory also lets prune() keep a rollback
  * release without that older version leaking onto the page.
  *
- * The version comes from the nightly feed because that is what an installed client
- * reads by default; the latest feed is cross-checked so a page can never advertise a
- * version that disagrees with one of the two channels.
+ * The version comes from the x64 nightly feed because that is what an installed client
+ * reads by default. All four feeds (nightly/latest for both architectures) are
+ * cross-checked: a publish cancelled after one architecture finishes leaves the other
+ * architecture's feeds on the previous version, and a page declaring one version for
+ * both would then contradict what those clients read (seen 2026-11-07).
  * @param {string[]} argv Command-line arguments (currently none).
  * @returns {Promise<void>}
  */
@@ -785,13 +854,13 @@ export async function publishDownloadIndex(argv) {
   parseArgs({ args: argv, strict: true, allowPositionals: false })
   const remoteRoot = resolveRemoteRoot()
   const listing = await remoteListing(remoteRoot)
-  const version = await remotePublishedVersion(remoteRoot, 'nightly-linux.yml')
-  if (version === undefined || valid(version) === null) {
-    throw new Error('desktop self-hosted upload: cannot render index.html without the published feed version')
-  }
-  const latest = await remotePublishedVersion(remoteRoot, 'latest-linux.yml')
-  if (latest !== undefined && latest !== version) {
-    throw new Error(`desktop self-hosted upload: nightly feed says ${version} but latest feed says ${latest}; refusing to publish a contradictory index`)
+  const versions = Object.fromEntries(await Promise.all(
+    INDEX_FEEDS.map(async name => [name, await remotePublishedVersion(remoteRoot, name)]),
+  ))
+  const version = reconcileFeedVersions(versions)
+  const missing = missingDownloadPackages(version, listing)
+  if (missing.length > 0) {
+    process.stdout.write(`desktop self-hosted upload: WARNING ${version} is missing ${missing.join(', ')} on the server; the page will be incomplete\n`)
   }
   const contents = renderDownloadIndex(version, listing)
   const stage = join(dirname(resolve(import.meta.filename)), '..', '.desktop-build', 'index')
