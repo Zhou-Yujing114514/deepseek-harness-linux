@@ -1,6 +1,8 @@
 /** Normalize HTTP and in-band Messages errors into provider-neutral failures. */
 
-import { isContextWindowExceededError, isQuotaExceededError, LlmError, ProviderRequestId } from '@deepseek-ai/dsh-llm'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import { isContextWindowExceededError, isQuotaExceededError, LlmError, type ProviderRequestId } from '@deepseek-ai/dsh-llm'
+import type { BuiltinLlmFailureCode } from '@deepseek-ai/dsh-llm'
 
 /** Read only provider error fields used by bounded Files recovery.
  * @param raw - decoded HTTP error response.
@@ -25,7 +27,7 @@ export function providerError(raw: unknown, status: number | undefined, headers?
   const message = typeof error.message === 'string' ? error.message : `DeepSeek Messages request failed (${status ?? 'stream error'})`
   const type = typeof error.type === 'string' ? error.type : ''
   const detail = `${type} ${typeof error.code === 'string' ? error.code : ''} ${message}`
-  let code: string
+  let code: BuiltinLlmFailureCode
   if (status === 401 || status === 403 || ['authentication_error', 'permission_error'].includes(type)) code = 'AUTH'
   else if (isQuotaExceededError(detail) || status === 402) code = 'QUOTA'
   else if (status === 429 || type === 'rate_limit_error') code = 'RATE_LIMIT'
@@ -38,7 +40,7 @@ export function providerError(raw: unknown, status: number | undefined, headers?
   const id = headers?.get('request-id') ?? headers?.get('x-request-id') ?? headers?.get('x-deepseek-request-id')
   return new LlmError(message, code, {
     ...status === undefined ? {} : { status },
-    ...id ? { requestId: ProviderRequestId(id) } : {},
+    ...id ? { requestId: brandString<ProviderRequestId>(id) } : {},
     ...Number.isFinite(delay) && delay > 0 ? { providerRetryAfterMs: delay } : {},
   })
 }

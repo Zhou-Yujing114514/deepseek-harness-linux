@@ -1,4 +1,5 @@
 /** Background-job menu geometry over the normal Browser dock in the shipped Web composition. */
+import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
@@ -6,9 +7,10 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
-import { JobId } from '@deepseek-ai/dsh-jobs'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm'
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { JobId } from '@deepseek-ai/dsh-jobs'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import {
   assertFixtureInventory, compareOrRefreshGolden, launchWebScaffold, seedSession,
   watchConsole, webSnapshotMode, type WebScaffold,
@@ -18,7 +20,7 @@ import { newEnglishPage, saveFailureShot } from './support.ts'
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/fresh-round-trip/session.v3.jsonl', import.meta.url))
 const EXPECTED_DIR = fileURLToPath(new URL('./expected/jobs-menu-layering', import.meta.url))
 const MODE = webSnapshotMode()
-const SEED_ID = SessionId('jobs-menu-layering-web-e2e')
+const SEED_ID = brandString<SessionId>('jobs-menu-layering-web-e2e')
 // The private scaffold cwd owns the barrier; the loop bounds an orphan's lifetime.
 const RELEASE = '.jobs-menu-layering.release'
 const COMMAND = `printf 'jobs-menu-%s\\n' output; for _ in $(seq 1 3000); do [ -e ${RELEASE} ] && break; sleep 0.2; done`
@@ -27,7 +29,7 @@ const COMMAND = `printf 'jobs-menu-%s\\n' output; for _ in $(seq 1 3000); do [ -
 function placement(page: Page) {
   return page.evaluate(() => {
     const list = document.querySelector<HTMLElement>('ul[aria-label="Background jobs"]')
-    const anchor = document.querySelector<HTMLElement>('button[aria-label="1 background job running"]')
+    const anchor = document.querySelector<HTMLElement>('button[aria-label="1 background job"]')
     const frame = document.querySelector<HTMLElement>('[data-sidebar-browser-frame]')
     const dock = document.querySelector<HTMLElement>('[data-sidebar-right-panel][data-sidebar-right-open]')
     if (list === null || anchor === null || frame === null || dock === null) {
@@ -46,13 +48,13 @@ function placement(page: Page) {
       [0.25, 0.5, 0.75].every(y => menu.contains(document.elementFromPoint(
         left + (right - left) * x, top + (bottom - top) * y,
       ))))
-    const expectedLeft = Math.min(Math.max(trigger.left, 12), innerWidth - box.width - 12)
-    const expectedTop = Math.min(Math.max(trigger.bottom + 5, 12), innerHeight - box.height - 12)
+    const verticalGap = Math.min(Math.abs(box.top - trigger.bottom - 5), Math.abs(trigger.top - box.bottom - 5))
+    const horizontalAlignment = Math.min(Math.abs(box.left - trigger.left), Math.abs(box.right - trigger.right))
     return {
       dockMode: dock.dataset.sidebarRightPanel,
       bodyMounted: menu.parentElement === document.body,
       fixed: getComputedStyle(menu).position === 'fixed',
-      anchored: Math.abs(box.left - expectedLeft) <= 1 && Math.abs(box.top - expectedTop) <= 1,
+      anchored: verticalGap <= 1 && horizontalAlignment <= 1,
       viewportBounded: box.left >= 11 && box.top >= 11
         && box.right <= innerWidth - 11 && box.bottom <= innerHeight - 11,
       overlapsBrowser,
@@ -104,6 +106,7 @@ describe.skipIf(MODE === 'record')('web e2e: jobs menu layering', () => {
 
   it('keeps the list and live output above the Browser dock while anchored and dismissable', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-jobs-menu-layering'))
+    const initialViewport = page.viewportSize()!
     const session = page.locator(`[data-row-key="session:${SEED_ID}"]`)
     await expect.poll(async () => {
       if (await session.isVisible()) return true
@@ -116,9 +119,9 @@ describe.skipIf(MODE === 'record')('web e2e: jobs menu layering', () => {
     const opened = scaffold.ctx.agents.get(SEED_ID)
     if (opened === undefined) throw new Error('opened session has no live Agent')
     agent = opened
-    const started = await scaffold.ctx.tools.execute({
+    const started = await executeToolFixture(scaffold.ctx, {
       signal: new AbortController().signal,
-      callId: ToolCallId('jobs-menu-layering-e2e'),
+      callId: brandString<ToolCallId>('jobs-menu-layering-e2e'),
       name: 'bash',
       arguments: { command: COMMAND, description: 'Emit output and hold the jobs menu fixture', run_in_background: true },
       agent,
@@ -126,7 +129,7 @@ describe.skipIf(MODE === 'record')('web e2e: jobs menu layering', () => {
     const reported = started.content.map(block => block.type === 'text' ? block.text : '').join('')
     const matched = /\bbash-[0-9a-f]{16}\b/.exec(reported)
     if (matched === null) throw new Error(`background bash reported no job id: ${reported}`)
-    const startedJobId = JobId(matched[0])
+    const startedJobId = brandString<JobId>(matched[0])
     jobId = startedJobId
     // Registration precedes shell startup; inspect its output before depending on a live row.
     await expect.poll(() => {
@@ -147,7 +150,7 @@ describe.skipIf(MODE === 'record')('web e2e: jobs menu layering', () => {
     await page.frameLocator('[data-sidebar-browser-frame]')
       .getByRole('heading', { name: 'Jobs menu browser fixture' }).waitFor()
 
-    const trigger = page.getByRole('button', { name: '1 background job running', exact: true })
+    const trigger = page.getByRole('button', { name: '1 background job', exact: true })
     await trigger.waitFor({ timeout: 15_000 })
     await trigger.focus()
     await page.keyboard.press('Enter')
@@ -183,6 +186,13 @@ describe.skipIf(MODE === 'record')('web e2e: jobs menu layering', () => {
     await list.waitFor({ state: 'detached' })
     const outsideDismisses = await trigger.getAttribute('aria-expanded') === 'false'
     expect(outsideDismisses).toBe(true)
+    await page.setViewportSize(initialViewport)
+    await trigger.hover()
+    await list.waitFor()
+    expect(await address.evaluate(element => element === document.activeElement)).toBe(true)
+    await page.keyboard.press('Escape')
+    await list.waitFor({ state: 'detached' })
+    expect(await address.evaluate(element => element === document.activeElement)).toBe(true)
     expect(scaffold.ctx.jobs.get(jobId, agent.id).status).toBe('running')
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])

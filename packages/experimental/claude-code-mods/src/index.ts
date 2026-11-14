@@ -10,13 +10,14 @@
  * @module @deepseek-ai/dsh-experimental-claude-code-mods
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import { FiberState, type Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import z from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { AssistantMessage, ContentBlock, TokenUsage } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import { validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
@@ -47,7 +48,7 @@ export type { BoxProps, ButtonProps, TextProps, UiElement, UiElements, UiNode } 
 export { defineMod, type ModConfig, type ModPlugin, type ModSpec } from './define-mod.ts'
 export { DEFAULT_TOOL_ALIASES } from './tool-names.ts'
 export { KNOWN_EVENTS } from './matcher.ts'
-export { MODS_API_VERSION } from './host-ops.ts'
+export { ModUnansweredError, MODS_API_VERSION } from './host-ops.ts'
 
 /** Plugin config: the limits mod hooks run under. */
 export interface Config {
@@ -208,8 +209,8 @@ export class ClaudeCodeMods extends TypertRemoteService {
     bandRows: z.number().default(10),
   })
 
-  // Session initialization requires its directory owner; other services are read on demand.
-  static inject = ['workingDirectory']
+  // Session initialization requires its directory and turn-boundary reader; other services are read on demand.
+  static inject = ['workingDirectory', 'agents']
 
   private readonly engine: ModsEngine<AgentBinding>
   private readonly registrations = new Map<string, Set<() => void>>()
@@ -229,7 +230,7 @@ export class ClaudeCodeMods extends TypertRemoteService {
     const modCommands = new Set<string>()
     const modTools = new Set<string>()
     const report = (line: string): void => { ctx.logger.warn(`claude-code-mods: ${line}`) }
-    const agentOf = (sessionId: string): Agent | undefined => ctx.get('agents')?.get(SessionId(sessionId))
+    const agentOf = (sessionId: string): Agent | undefined => ctx.get('agents')?.get(brandString<SessionId>(sessionId))
     const detached = new DetachedRuns(report)
     const surfaces = new SurfaceTable({
       columns: bandColumns,
@@ -274,6 +275,10 @@ export class ClaudeCodeMods extends TypertRemoteService {
     })
     this.engine = engine
     const registrations = this.registrations
+    // Dependent mod disposers join timer callbacks before this provider's cleanup runs.
+    ctx.on('internal/status', (fiber) => {
+      if (fiber === ctx.fiber && fiber.state === FiberState.UNLOADING) detached.cancel()
+    })
     ctx.effect(() => async () => {
       // Cancel first: a timer callback waiting inside a `$` call ends on this signal, and engine.dispose awaits it.
       detached.cancel()
@@ -287,7 +292,7 @@ export class ClaudeCodeMods extends TypertRemoteService {
     // Read at each use: the registry may mount after this plugin in a composition.
     const isRoot = (agent: Agent): boolean => {
       const agents = ctx.get('agents')
-      return agents === undefined || agents.roots().includes(agent)
+      return agent.session.header.origin !== 'subagent' && (agents === undefined || agents.get(agent.id) === agent)
     }
     /** Root agents that received `session.start`; the registry no longer lists an agent once it is disposed. */
     const startedRoots = new Set<string>()

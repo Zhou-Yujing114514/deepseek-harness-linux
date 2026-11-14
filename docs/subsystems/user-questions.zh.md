@@ -22,7 +22,7 @@ interface AskUserQuestionOption {
 
 ## 呈现意图
 
-`AskUserQuestionIntent` 可选地声明一种已知的决策类型。它以 `kind` 作为标记，以便后续加入更多意图；不认识某个标记的 UI 会渲染通用选项列表。意图只改变呈现——遵循它的 UI 回答的选项标签与通用 UI 相同，因此调用方读到的答案字段一致。`approve` 指明表示同意的选项，而不依赖选项顺序。`ask()` 拒绝两种类型无法表达的断言：`approve` 未命名该问题自己的任何选项，以及没有 `detail` 的问题声明了意图。
+`AskUserQuestionIntent` 改变呈现方式，保留选项标签和调用方的决策规则。`plan-review` 指定批准选项，并要求提供计划正文。`approval` 要求只有一个阻塞式问题，带有说明以及互不相同的拒绝、允许和可选的始终允许标签，完整对应已提供的选项，不支持多选或计时等待。CUA 前端通过现有 composer 呈现自己的固定审批；普通问答和计划审阅继续使用原有呈现。
 
 ```ts type-equiv
 /**
@@ -43,6 +43,23 @@ type AskUserQuestionIntent = {
   approve: string
   /** Logged tool invocation whose arguments contain the reviewed plan. */
   callId?: ToolCallId
+} | {
+  /** A blocking permission decision with fixed actions and no free-text answer. */
+  kind: 'approval'
+  /** Option label granting the scope described by the caller. */
+  approve: string
+  /** Option label refusing the requested access. */
+  reject: string
+  /** Optional persistent grant offered only when the caller supports it. */
+  always?: string
+  /** Metadata for human recognition; the caller admits icon sources, which the UI may load as URLs. Never an authorization identity. */
+  subject?: { name: string; icon?: string }
+  /** Localized question and limited-grant label; fixed cards own reject/always wording. Option labels remain answer values. */
+  display?: {
+    question: { en: string; [locale: string]: string }
+    detail?: { en: string; [locale: string]: string }
+    approve?: { en: string; [locale: string]: string }
+  }
 }
 ```
 
@@ -192,7 +209,7 @@ Host 重启后，Session 重开时 Remote 层会恢复根 agent。之后的迟�
 
 ## 错误
 
-`UserQuestionError` 继承 `HarnessError`，因此 `ctx.tools.execute()` 会保留 `{ name, code }`，用于面向模型的工具失败，如 `EMPTY_QUESTIONS`、`BAD_INTENT`、`NO_PROVIDER`、`ASK_ABORTED` 或 UI 侧取消。
+`UserQuestionError` 继承 `HarnessError`，因此 `ctx.tools.execute()` 会保留 `{ name, code }`，用于面向模型的工具失败，如 `EMPTY_QUESTIONS`、`BAD_INTENT`、`NO_PROVIDER`、`ASK_ABORTED` 或 UI 侧取消。不是 `HarnessError` 的应答方失败会变为 `PROVIDER_ERROR`，保留原 message，原错误作为 `cause`；其他 `HarnessError` 保留自身的 `name` 与 `code`。
 
 ```ts type-equiv
 /** Stable error taxonomy for user-questions failures. */
@@ -261,17 +278,19 @@ async askTimed( request: AskUserQuestionRequest & { agent: Agent }, callId: Tool
  * Ask the scoped answerer waterfall and wait for the user's answer.
  *
  * When a caller supplies an agent, human interaction is valid only for the
- * exact live runtime root. Runtime ownership, not durable session lineage,
- * decides this boundary: an owned child has no human answerer and would
- * block forever, while a lineage-bearing session resumed as a new runtime
- * root may ask normally.
+ * exact live instance of an ordinary Session. Explicit subagent origin
+ * rejects delegated callers; historical ordinary forks may retain parent
+ * metadata and still ask normally.
  *
  * @param request Questions, owner agent, and abort signal.
  * @returns The answer chosen or typed by the human.
  * @throws {UserQuestionError} code `ASK_ABORTED` when the supplied signal
  *   is already or becomes aborted, `CALLER_NOT_LIVE` when a supplied agent
- *   is not the registry's exact live instance, or `DELEGATED_CALLER` when
- *   that live agent is owned by another agent.
+ *   is not the registry's exact live instance, `DELEGATED_CALLER` when
+ *   that live agent has subagent origin, or `PROVIDER_ERROR`, keeping the
+ *   original message, when an answerer fails with a value that is not a
+ *   `HarnessError`; a coded `HarnessError` from an answerer keeps its `name`
+ *   and `code`.
  */
 async ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
 ```

@@ -3,6 +3,7 @@ import type { Volatile } from '@deepseek-ai/cordis'
 
 import z from '@deepseek-ai/schemastery'
 import { isVolatile } from '@deepseek-ai/cosmokit'
+import { deepEqualJson } from '@deepseek-ai/dsh-util-values'
 import { resolveRetryPolicy, RetryPolicySchema } from '@deepseek-ai/dsh-llm'
 import type { ModelModality, RetryPolicyConfig } from '@deepseek-ai/dsh-llm'
 import type { LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
@@ -42,7 +43,7 @@ export interface Config {
   inlineImageOffloadByteQuantum: Volatile<number>
   /** Image-count removal step after the request exceeds its count bound (default 20). */
   imageOffloadCountQuantum: Volatile<number>
-  /** Maximum duration of one request-image Files API resolution (default one minute). */
+  /** Maximum duration of one request-image Files API resolution (default 20 seconds). */
   filesApiTimeoutMs: Volatile<number>
   /** Explicit lifetime assigned to each uploaded image (default seven days). */
   fileExpiresAfterSeconds: Volatile<number>
@@ -119,6 +120,16 @@ const BASE_URL_ENV = 'DEEPSEEK_BASE_URL'
 
 /** Complete protocol settings captured for one request operation. */
 export type ResolvedDeepSeekOptions = DeepSeekConnectionOptions
+
+/**
+ * Whether a resolved catalog is the built-in one, which is what a `models`
+ * setting nobody customized resolves to.
+ * @param models - catalog resolved by {@link resolveAdapterOptions}.
+ * @returns whether `models` equals the resolved built-in catalog, entry by entry and in order.
+ */
+export function isBuiltInCatalog(models: readonly DeepSeekCatalogModel[]): boolean {
+  return deepEqualJson(models, resolveModels(DEFAULT_MODELS))
+}
 
 /** Resolve, validate, and detach the advisory model catalog. */
 function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): DeepSeekCatalogModel[] {
