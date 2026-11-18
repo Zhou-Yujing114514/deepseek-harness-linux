@@ -242,8 +242,14 @@ jobs:
             echo "Pull request #${EXISTING} already exists for this branch."
             exit 0
           fi
-          gh pr create \
-            --base master \
-            --head "${{ steps.merge.outputs.branch }}" \
-            --title "chore: sync with upstream deepseek-ai/deepseek-harness (${{ steps.gap.outputs.behind }} commits)" \
-            --body-file pr-body.md
+          # `gh pr create` uses the GraphQL createPullRequest mutation, which the
+          # GITHUB_TOKEN integration is not allowed to call (it fails with
+          # "Resource not accessible by integration (createPullRequest)" even when
+          # the repo's "allow Actions to create/approve PRs" switch is on). The REST
+          # endpoint is permitted with the pull-requests: write scope declared above.
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/pulls" \
+            -f base=master \
+            -f head="${{ steps.merge.outputs.branch }}" \
+            -f title="chore: sync with upstream deepseek-ai/deepseek-harness (${{ steps.gap.outputs.behind }} commits)" \
+            -F body=@pr-body.md \
+            --jq '.html_url'
