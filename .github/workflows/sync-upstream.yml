@@ -52,6 +52,10 @@ env:
     apps/desktop/package.json
     .github/workflows/desktop-linux.yml
     .github/workflows/release-attach.yml
+    # This sync workflow is fork-only (upstream has no such file). Protect it too:
+    # if upstream ever adds a same-named workflow, an add/add conflict must keep ours,
+    # otherwise the daily job that proposes alignment would be replaced by upstream's.
+    .github/workflows/sync-upstream.yml
     # Our dependabot config deliberately drops the uv updater for /python/sdk:
     # its local editable path dependency cannot be resolved by Dependabot. Upstream
     # may re-add that entry when merging, so keep our version on conflict.
@@ -215,7 +219,13 @@ jobs:
           git push --force origin "${{ steps.merge.outputs.branch }}"
 
       - name: Open a pull request
-        if: steps.gap.outputs.behind != '0' && inputs.open-pr != false
+        # `inputs.open-pr` only exists on workflow_dispatch runs. On a scheduled run it
+        # is empty, and in an Actions expression comparing that empty value with
+        # `false` evaluates to false -- which silently skipped this step every day:
+        # the merged sync/upstream branch was pushed, but no PR ever proposed it to
+        # master, so the fork drifted behind upstream while every run looked green.
+        # Only an explicit manual opt-out may disable PR creation.
+        if: steps.gap.outputs.behind != '0' && (github.event_name != 'workflow_dispatch' || inputs.open-pr != false)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
