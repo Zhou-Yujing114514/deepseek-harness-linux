@@ -256,19 +256,31 @@ jobs:
           # endpoint is permitted with the pull-requests: write scope declared above.
           # Tolerate a race where another run created the PR in between: re-check on
           # failure and treat "already exists" as success instead of failing the sync.
-          if gh api -X POST "repos/${GITHUB_REPOSITORY}/pulls" \
+          # Capture the POST result so a duplicate can be told apart from a real failure.
+          # The REST list query above occasionally returns empty on a transient API hiccup;
+          # in that case POST answers with 422 "already exists", which is still success.
+          CREATE_OUTPUT=""
+          if CREATE_OUTPUT="$(gh api -X POST "repos/${GITHUB_REPOSITORY}/pulls" \
             -f base=master \
             -f head="${BRANCH}" \
             -f title="chore: sync with upstream deepseek-ai/deepseek-harness (${{ steps.gap.outputs.behind }} commits)" \
             -F body=@pr-body.md \
-            --jq '.html_url'; then
+            --jq '.html_url' 2>&1)"; then
+            printf '%s\n' "${CREATE_OUTPUT}"
             exit 0
           fi
+          case "${CREATE_OUTPUT}" in
+            *'A pull request already exists'*)
+              echo "Pull request already exists (POST reported 422); treating as success."
+              exit 0
+              ;;
+          esac
           EXISTING="$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&base=master&head=${OWNER}:${BRANCH}" \
-            --jq '.[0].number // empty' || true)"
+            --jq '.[0].number // empty' 2>/dev/null || true)"
           if [ -n "${EXISTING}" ]; then
             echo "Pull request #${EXISTING} already exists (created concurrently); treating as success."
             exit 0
           fi
+          printf '%s\n' "${CREATE_OUTPUT}" >&2
           echo "Failed to open a pull request and none exists for ${BRANCH}." >&2
           exit 1
