@@ -45,6 +45,15 @@ env:
   # Paths this fork owns. Upstream touches some of them too (desktop packaging exists
   # upstream as well), but on conflict we keep our side: Linux packaging is the entire
   # reason this repository exists. Everything outside this list follows upstream.
+  #
+  # Keep the `|` block a plain list of paths: the merge script treats every line as a
+  # prefix rule, so explanatory comments must live outside the block. Fork-only entries:
+  #   - .github/workflows/sync-upstream.yml  fork-only; guard against add/add conflicts
+  #   - .github/dependabot.yml              drops the uv updater (its local editable
+  #                                         path dependency cannot be resolved by Dependabot)
+  #   - the three tests below               fork-only features (self-hosted publishing,
+  #                                         plugin compatibility, Wayland launcher);
+  #                                         upstream owns the rest of desktop tests
   OURS_PATHS: |
     apps/desktop/scripts/
     apps/desktop/.env.linux.example
@@ -52,18 +61,8 @@ env:
     apps/desktop/package.json
     .github/workflows/desktop-linux.yml
     .github/workflows/release-attach.yml
-    # This sync workflow is fork-only (upstream has no such file). Protect it too:
-    # if upstream ever adds a same-named workflow, an add/add conflict must keep ours,
-    # otherwise the daily job that proposes alignment would be replaced by upstream's.
     .github/workflows/sync-upstream.yml
-    # Our dependabot config deliberately drops the uv updater for /python/sdk:
-    # its local editable path dependency cannot be resolved by Dependabot. Upstream
-    # may re-add that entry when merging, so keep our version on conflict.
     .github/dependabot.yml
-    # Exact paths, not the whole tests/ directory: upstream owns the rest of the
-    # desktop tests and those must keep following upstream. These three cover
-    # fork-only features (self-hosted publishing, plugin compatibility diagnosis,
-    # and the optional Wayland launcher).
     apps/desktop/tests/upload-selfhosted.spec.ts
     apps/desktop/tests/plugin-linux-compat.spec.ts
     apps/desktop/tests/linux-launch-compat.spec.ts
@@ -230,6 +229,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          BRANCH="${{ steps.merge.outputs.branch }}"
+          OWNER="${GITHUB_REPOSITORY%%/*}"
           # Close PRs left behind by the old timestamped branch naming. With the fixed branch
           # name above, only one sync PR can be open from now on.
           LEGACY="$(gh pr list --state open --json number,headRefName \
@@ -237,9 +238,15 @@ jobs:
           for n in ${LEGACY}; do
             gh pr close "${n}" --comment "Superseded by the fixed \`sync/upstream\` branch." || true
           done
-          EXISTING="$(gh pr list --head "${{ steps.merge.outputs.branch }}" --json number --jq '.[0].number' || true)"
+          # Query open PRs for this exact head via REST. `gh pr list --head <branch>` with a
+          # bare branch name returns nothing under the Actions GITHUB_TOKEN integration, which
+          # used to make every daily run fall through to POST and fail with 422
+          # "A pull request already exists ...". The REST list endpoint with a fully-qualified
+          # `owner:branch` head filter is reliable here.
+          EXISTING="$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&base=master&head=${OWNER}:${BRANCH}" \
+            --jq '.[0].number // empty' || true)"
           if [ -n "${EXISTING}" ]; then
-            echo "Pull request #${EXISTING} already exists for this branch."
+            echo "Pull request #${EXISTING} already exists for ${BRANCH}; nothing to do."
             exit 0
           fi
           # `gh pr create` uses the GraphQL createPullRequest mutation, which the
@@ -247,9 +254,21 @@ jobs:
           # "Resource not accessible by integration (createPullRequest)" even when
           # the repo's "allow Actions to create/approve PRs" switch is on). The REST
           # endpoint is permitted with the pull-requests: write scope declared above.
-          gh api -X POST "repos/${GITHUB_REPOSITORY}/pulls" \
+          # Tolerate a race where another run created the PR in between: re-check on
+          # failure and treat "already exists" as success instead of failing the sync.
+          if gh api -X POST "repos/${GITHUB_REPOSITORY}/pulls" \
             -f base=master \
-            -f head="${{ steps.merge.outputs.branch }}" \
+            -f head="${BRANCH}" \
             -f title="chore: sync with upstream deepseek-ai/deepseek-harness (${{ steps.gap.outputs.behind }} commits)" \
             -F body=@pr-body.md \
-            --jq '.html_url'
+            --jq '.html_url'; then
+            exit 0
+          fi
+          EXISTING="$(gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&base=master&head=${OWNER}:${BRANCH}" \
+            --jq '.[0].number // empty' || true)"
+          if [ -n "${EXISTING}" ]; then
+            echo "Pull request #${EXISTING} already exists (created concurrently); treating as success."
+            exit 0
+          fi
+          echo "Failed to open a pull request and none exists for ${BRANCH}." >&2
+          exit 1
