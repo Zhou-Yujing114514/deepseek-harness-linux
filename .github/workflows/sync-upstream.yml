@@ -1,15 +1,19 @@
-# Keep this fork aligned with the official DeepSeek Harness repository.
+# Measure the gap to the official DeepSeek Harness repository, on demand only.
 #
-# Upstream ships macOS and Windows desktop builds only; this repository adds first-class
-# Linux packaging on top of it. Upstream moves very fast (hundreds of commits per week),
-# so reconciling by hand is not realistic. This workflow does it on GitHub's own runners,
-# where fetching upstream is cheap and reliable.
+# This fork is a Linux distribution pinned to a known-good upstream release, with the
+# Linux-specific fixes maintained here as an explicit patch set. Automatic daily merges
+# were the single largest source of recurring breakage: every upstream refactor of the
+# desktop publisher silently invalidated our packaging files, a force-push to
+# sync/upstream dropped locally applied fixes the next morning, and every run opened a
+# noisy PR. Nothing here runs on a timer any more.
 #
-# What one run does:
+# A maintainer triggers this manually only when a new official release is worth
+# evaluating. The result lands on sync/upstream, never master. What one manual run does:
 #   1. Fetch the official ref and measure how far behind we are.
 #   2. Merge it into a fresh sync branch.
 #   3. Resolve the conflicts that are predictable in a packaging fork:
-#        - paths this fork owns (Linux packaging, Linux CI, READMEs) -> keep ours
+#        - paths this fork owns (Linux packaging, Linux CI, READMEs, the standalone
+#          Node Host fix) -> keep ours
 #        - everything else (upstream source, dependency and version bumps) -> take upstream
 #   4. Push that branch and open a pull request summarising what came from where.
 #
@@ -29,9 +33,6 @@ on:
         required: false
         type: boolean
         default: true
-  schedule:
-    # 02:17 UTC, daily.
-    - cron: '17 2 * * *'
 
 permissions:
   contents: write
