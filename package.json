@@ -272,7 +272,7 @@
     "oxlint": "1.81.0",
     "oxlint-tsgolint": "7.0.2001",
     "papaparse": "5.5.3",
-    "pnpm": "11.28.5",
+    "pnpm": "12.15.0",
     "publint": "^0.3.24",
     "semver": "^7.8.5",
     "smol-toml": "^1.9.0",
