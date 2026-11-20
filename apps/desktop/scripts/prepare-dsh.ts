@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process'
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join, relative, resolve } from 'node:path'
-import { desktopNodeEnvironment } from '../src/node-environment.ts'
+import { desktopNodeEnvironment, desktopNodeRuntime } from '../src/node-environment.ts'
 import { createRuntimeProjectMetadata } from '../src/project-manager.ts'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import { parseDesktopRelease, type DesktopRelease } from '../src/release.ts'
@@ -43,8 +43,12 @@ const STORE_ROOT = join(BUILD_ROOT, 'store')
 const RUNTIME_ROOT = BUILD_PATHS.runtime
 const PNPM_BUILD_STATE = BUILD_PATHS.dshPnpm
 const PACKAGE_SET_ROOT = BUILD_PATHS.packageSet
-const NODE = join(BUILD_PATHS.electron, process.platform === 'win32' ? 'electron.exe'
+const ELECTRON = join(BUILD_PATHS.electron, process.platform === 'win32' ? 'electron.exe'
   : process.platform === 'linux' ? 'electron' : 'Electron.app/Contents/MacOS/Electron')
+// Linux hosts the payload in the primary runtime's standalone Node rather than Electron's Node
+// mode, so both the pnpm build step and the prepared-runtime smoke must select the same runtime as
+// the packaged shell (see desktopNodeRuntime).
+const NODE = desktopNodeRuntime(process.platform, ELECTRON, join(RUNTIME_ROOT, 'primary-runtime'))
 const PNPM = join(RUNTIME_ROOT, 'primary-runtime', 'dependencies', 'pnpm', 'bin', 'pnpm.mjs')
 
 function manifestVersion(path: string, subject: string): string {
@@ -78,7 +82,7 @@ function runPnpm(args: readonly string[]): Promise<void> {
     const userConfig = join(config, 'npmrc')
     mkdirSync(config, { recursive: true })
     writeFileSync(userConfig, '')
-    const child = spawn(NODE, [
+    const child = spawn(NODE.executable, [
       '--expose-internals',
       PNPM,
       `--config.registry=${registry}`,

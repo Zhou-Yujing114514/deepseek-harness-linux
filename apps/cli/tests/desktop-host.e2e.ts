@@ -70,7 +70,10 @@ it.each([false, true])('settles startup after parent IPC disconnect (boot failur
     })
     expect(boot.packageManager.command).toBe(process.execPath)
     expect(boot.packageManager.args).toEqual(['--expose-internals', pnpm])
-    expect(boot.packageManager.env.ELECTRON_RUN_AS_NODE).toBe('1')
+    // This fixture forks the Host under a standalone Node, the runtime the Linux shell selects, so the
+    // package manager must not be told to re-enter Electron's Node mode.
+    expect(boot.packageManager.env.ELECTRON_RUN_AS_NODE).toBeUndefined()
+    expect(boot.packageManager.env.DSH_DESKTOP_NODE_ELECTRON).toBe('0')
     expect(boot.packageManager.env.PATH).toBe(`${nodeBin}${delimiter}${process.env.PATH ?? ''}`)
     child.disconnect()
     const exitCode = await exited

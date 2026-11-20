@@ -7,6 +7,10 @@ import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError,
 const roots: string[] = []
 const hosts: DesktopHostProcess[] = []
 
+// The fixture Host is a plain Node program; the shell always states whether the runtime it
+// selected is Electron, because only Electron needs ELECTRON_RUN_AS_NODE.
+const HOST_RUNTIME = { executable: process.execPath, electron: true }
+
 const HTTP_HOST = `
 import { createServer } from 'node:http'
 import { writeFileSync } from 'node:fs'
@@ -62,7 +66,7 @@ function projectWithHost(source = HTTP_HOST): string {
 function hostProcess(
   runtime: string, profile = runtime, onFailure?: (error: Error) => void, environment = process.env,
 ): DesktopHostProcess {
-  const host = new DesktopHostProcess(process.execPath, runtime, profile, undefined, environment, onFailure)
+  const host = new DesktopHostProcess(HOST_RUNTIME, runtime, profile, undefined, environment, onFailure)
   hosts.push(host)
   return host
 }
@@ -133,7 +137,7 @@ describe('desktop host process', () => {
     const runtime = projectWithHost(HTTP_HOST.replace('runtime: process.argv[2]',
       'pnpm: process.argv[5], nodeBin: process.argv[6], primaryRuntime: process.argv[4], runtime: process.argv[2]'))
     const primaryRuntime = join(runtime, 'external-primary-runtime')
-    const host = new DesktopHostProcess(process.execPath, runtime, runtime, undefined, process.env,
+    const host = new DesktopHostProcess(HOST_RUNTIME, runtime, runtime, undefined, process.env,
       undefined, primaryRuntime, { pnpm: join(runtime, 'pnpm.mjs'), nodeBin: join(runtime, 'bin') })
     hosts.push(host)
     const { url } = await host.start()
@@ -174,7 +178,7 @@ describe('desktop host process', () => {
 
   it('settles teardown when the executable cannot be spawned', async () => {
     const runtime = projectWithHost()
-    const host = new DesktopHostProcess(join(runtime, 'missing-node'), runtime, runtime)
+    const host = new DesktopHostProcess({ executable: join(runtime, 'missing-node'), electron: true }, runtime, runtime)
     hosts.push(host)
     await expect(host.start()).rejects.toThrow()
     await host.stop()
@@ -219,7 +223,7 @@ describe('desktop host process', () => {
 it.each([null, 'stable-account'])('carries Platform identity %s over private IPC and clears credentials on shutdown', async (userId) => {
   const runtime = projectWithHost(HTTP_HOST.replace("process.send({ type: 'ready'", "process.send({ type: 'platform-session', session: { origin: 'https://platform.deepseek.com', userId: " + JSON.stringify(userId) + ", token: 'fixture-secret', embeddedPageDist: 'feat/test' } }); process.send({ type: 'ready'"))
   const changed = vi.fn()
-  const host = new DesktopHostProcess(process.execPath, runtime, runtime, undefined, process.env, undefined, undefined, undefined, changed)
+  const host = new DesktopHostProcess(HOST_RUNTIME, runtime, runtime, undefined, process.env, undefined, undefined, undefined, changed)
   hosts.push(host)
   await host.start()
   expect(changed).toHaveBeenCalledWith({ origin: 'https://platform.deepseek.com', userId, token: 'fixture-secret', embeddedPageDist: 'feat/test' })
@@ -232,7 +236,7 @@ it.each([undefined, '', 7])('rejects malformed Platform account identity %s on p
   const runtime = projectWithHost(HTTP_HOST.replace("process.send({ type: 'ready'",
     `process.send({ type: 'platform-session', session: ${JSON.stringify(session)} }); process.send({ type: 'ready'`))
   const changed = vi.fn()
-  const host = new DesktopHostProcess(process.execPath, runtime, runtime, undefined, process.env, undefined, undefined, undefined, changed)
+  const host = new DesktopHostProcess(HOST_RUNTIME, runtime, runtime, undefined, process.env, undefined, undefined, undefined, changed)
   hosts.push(host)
   await expect(host.start()).rejects.toThrow('invalid IPC event')
   expect(changed.mock.calls).toEqual([[null]])

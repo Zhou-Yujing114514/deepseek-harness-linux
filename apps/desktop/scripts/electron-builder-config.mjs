@@ -127,7 +127,10 @@ export function createElectronBuilderConfig(
     // Unsigned and notarization-skipped builds carry their own suffix so a shared file can never pass for a release artifact.
     artifactName: `deepseek-harness-\${version}-\${os}-\${arch}${artifactOutput.suffix}.\${ext}`,
     directories: { output: artifactOutput.directory },
-    asar: true,
+    // A standalone Node cannot read inside an ASAR archive. Linux hosts the payload in the primary
+    // runtime's Node rather than Electron's Node mode, so it ships an unpacked `resources/app/dsh`
+    // tree; every other platform keeps the sealed archive.
+    asar: resolvedPlatform !== 'linux',
     electronDist: buildPaths.electron,
     electronFuses: { runAsNode: true },
     beforeBuild: async () => {

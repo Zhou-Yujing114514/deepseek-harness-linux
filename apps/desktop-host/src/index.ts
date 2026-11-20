@@ -15,6 +15,18 @@ import { installDesktopQuitInspection } from './quit-inspection.ts'
 import { installPlatformSessionPublisher } from './platform-session.ts'
 import { installOfficeEngineResolution } from './office-engine.ts'
 
+// An Electron process exposes its resources directory as `process.resourcesPath`; a standalone Node
+// (the Linux Host runtime) has no such concept. The shell passes the packaged installation's
+// resources root through the environment, and this republishes it so children that locate bundled
+// packages relative to Electron's layout (dsh-market's host lookup) see the same view as on
+// Windows/macOS. An Electron runtime already has the real thing, and its value always wins.
+// `resourcesPath` is Electron's own property, absent from Node's `Process` type: this host runs under
+// exactly one of the two runtimes, so the narrow view below is the truth for this process.
+const standaloneResourcesPath = process.env.DSH_DESKTOP_RESOURCES_PATH
+if (process.versions.electron === undefined && standaloneResourcesPath !== undefined && standaloneResourcesPath !== '') {
+  ;(process as NodeJS.Process & { resourcesPath?: string }).resourcesPath ??= standaloneResourcesPath
+}
+
 async function main(): Promise<void> {
   const runtimeDir = process.argv[2] as string
   const projectDir = process.argv[3] as string
@@ -33,7 +45,12 @@ async function main(): Promise<void> {
         command: process.execPath,
         args: ['--expose-internals', process.argv[5]],
         env: {
-          ELECTRON_RUN_AS_NODE: '1',
+          // Electron hosts this process where the shell selected it, and package scripts then have to
+          // re-enter Node mode. The Linux shell hosts it under a standalone Node instead, which those
+          // same scripts must not read as Electron when they select prebuilt native binaries.
+          ...(process.versions.electron === undefined
+            ? { DSH_DESKTOP_NODE_ELECTRON: '0' }
+            : { ELECTRON_RUN_AS_NODE: '1' }),
           DSH_DESKTOP_NODE_EXECUTABLE: process.execPath,
           PATH: `${process.argv[6] ?? ''}${delimiter}${process.env.PATH ?? ''}`,
         },

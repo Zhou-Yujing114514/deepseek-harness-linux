@@ -77,6 +77,27 @@ describe('installer preparation preserves application dependencies', () => {
     expect(config.artifactName).toBe('deepseek-harness-${version}-${os}-${arch}-unsigned.${ext}')
   })
 
+  it('ships an unpacked app tree on Linux so the standalone Node Host can read it', async () => {
+    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+    // A standalone Node cannot read inside an ASAR archive. Linux hosts the payload in the
+    // primary runtime's Node, so its `resources/app/dsh` tree must stay unpacked; every other
+    // platform keeps the sealed archive. Regression guard for the #24 / Ubuntu 24.04 fix.
+    const base = {
+      DSH_DESKTOP_APP_ID: 'com.example.installer',
+      DSH_DESKTOP_UNSIGNED: '1',
+      DSH_DESKTOP_TARGET_ARCH: 'x64',
+    }
+    const linux = createElectronBuilderConfig({ ...base, DSH_DESKTOP_TARGET_PLATFORM: 'linux' }, 'linux', 'x64')
+    expect(linux.asar).toBe(false)
+    const windows = createElectronBuilderConfig({
+      ...base,
+      DSH_DESKTOP_TARGET_PLATFORM: 'win32',
+      DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://policy.example.com',
+      DSH_DESKTOP_MANDATORY_UPDATE_CONFIG: JSON.stringify({ allowedAuthOrigins: ['https://login.example.com'] }),
+    }, 'win32', 'x64')
+    expect(windows.asar).toBe(true)
+  })
+
   it('packages every preload entry point the shell loads', async () => {
     const { readdirSync, readFileSync } = await import('node:fs')
     const sourceDirectory = new URL('../src/', import.meta.url)

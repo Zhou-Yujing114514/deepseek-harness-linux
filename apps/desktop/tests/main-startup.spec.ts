@@ -447,7 +447,10 @@ describe('desktop main startup', () => {
     harness.app.isPackaged = packaged
     await readyForUpdate()
     const host = harness.hosts[0]!
-    expect(host.node).toBe(process.execPath)
+    expect(host.node).toEqual({
+      executable: process.execPath, electron: true,
+      ...(packaged ? { resourcesPath: 'desktop-test-resources' } : {}),
+    })
     expect(host.primaryRuntime).toBe(packaged
       ? join('desktop-test-resources', 'runtime', 'primary-runtime') : 'test-primary-runtime')
     expect(host.packageManager).toMatchObject({
@@ -2230,7 +2233,7 @@ describe('desktop main startup', () => {
     await Promise.all([retry, secondRetry, harness.navigated.promise])
     expect(harness.applyRelease).toHaveBeenCalledTimes(1)
     expect(harness.hosts[0]).toMatchObject({
-      node: process.execPath,
+      node: { executable: process.execPath, electron: true, resourcesPath: 'desktop-test-resources' },
       runtime: join(harness.app.getAppPath(), 'dsh'),
       primaryRuntime: join('desktop-test-resources', 'runtime', 'primary-runtime'),
       profile: 'desktop-test-profile',
@@ -2253,7 +2256,7 @@ describe('desktop main startup', () => {
     harness.prepared.resolve()
     await harness.hostStarted.promise
     const project = join(harness.app.getAppPath(), '.desktop-build', 'development', 'project')
-    expect(harness.hosts[0]).toMatchObject({ node: process.execPath, runtime: project,
+    expect(harness.hosts[0]).toMatchObject({ node: { executable: process.execPath, electron: true }, runtime: project,
       primaryRuntime: 'test-primary-runtime', profile: 'desktop-test-profile' })
     expect(harness.applyRelease).toHaveBeenCalledOnce()
     harness.hosts[0]!.ready.resolve()

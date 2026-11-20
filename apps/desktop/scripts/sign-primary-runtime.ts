@@ -76,7 +76,8 @@ async function main(): Promise<void> {
         if (process.argv.includes('--dsh')) {
           const version = JSON.parse(await readFile(join(paths.dsh, 'package.json'), 'utf8')).version as string
           await signWindowsDesktopRuntime(paths.dsh, version, { ...options,
-            smoke: descriptor => smokePreparedRuntime(paths.dsh, join(paths.electron, 'electron.exe'), paths.runtime, descriptor),
+            smoke: descriptor => smokePreparedRuntime(paths.dsh,
+              { executable: join(paths.electron, 'electron.exe'), electron: true }, paths.runtime, descriptor),
           })
         } else {
           await signWindowsPrimaryRuntime(join(paths.runtime, 'primary-runtime'), { ...options, smoke: smokePrimaryRuntime })

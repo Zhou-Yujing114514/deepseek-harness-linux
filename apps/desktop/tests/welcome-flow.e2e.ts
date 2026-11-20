@@ -126,7 +126,7 @@ describe.skipIf(!existsSync(builtHost))('built Desktop welcome flow', () => {
       let hostOrigin = ''
       const restart = async (): Promise<void> => {
         await host?.stop()
-        host = new DesktopHostProcess(process.execPath, project, paths.profile)
+        host = new DesktopHostProcess({ executable: process.execPath, electron: true }, project, paths.profile)
         const { url } = await host.start()
         hostOrigin = new URL(url).origin
         let cookie = ''

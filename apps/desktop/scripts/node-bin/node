@@ -1,3 +1,14 @@
 #!/bin/sh
-export ELECTRON_RUN_AS_NODE=1
+# Electron reaches Node through ELECTRON_RUN_AS_NODE. A standalone Node must not be marked as
+# Electron, because package scripts read that marker to select prebuilt native binaries. An absent
+# marker keeps the Electron behavior for callers that scrub their environment.
+if [ "${DSH_DESKTOP_NODE_ELECTRON:-1}" = 1 ]; then export ELECTRON_RUN_AS_NODE=1; fi
+
+# Fail loudly instead of exec'ing an empty path: an unset DSH_DESKTOP_NODE_EXECUTABLE used to surface
+# as "line 6: exec: : not found" and reads like a broken install. The launcher always exports it, and
+# there is no safe fallback here -- guessing Electron would change the runtime behind the caller's back.
+if [ -z "${DSH_DESKTOP_NODE_EXECUTABLE:-}" ]; then
+  echo "node-bin/node: DSH_DESKTOP_NODE_EXECUTABLE is not set; the desktop launcher must provide it" >&2
+  exit 78
+fi
 exec "$DSH_DESKTOP_NODE_EXECUTABLE" --expose-internals "$@"

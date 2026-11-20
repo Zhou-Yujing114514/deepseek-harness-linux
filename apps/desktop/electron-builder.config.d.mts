@@ -8,6 +8,8 @@ export interface DesktopElectronBuilderConfig {
   readonly directories: {
     readonly output: string
   }
+  /** False on Linux: the standalone Node Host cannot read inside an ASAR archive. */
+  readonly asar: boolean
   readonly files: readonly [
     ...string[],
     { readonly from: string, readonly to: 'dsh', readonly filter: readonly ['**/*'] },

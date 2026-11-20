@@ -8,6 +8,7 @@ import { parseArgs } from 'node:util'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import type { DesktopRelease } from '../src/release.ts'
 import { developmentRuntimeDirectory, resolveDesktopBuildTarget } from './desktop-build-paths.mjs'
+import { desktopNodeRuntime } from '../src/node-environment.ts'
 import { prepareDevelopmentProject } from './development-project.ts'
 import { prepareDevelopmentApp } from './development-app.ts'
 import { preparePrimaryRuntime } from './prepare-primary-runtime.ts'
@@ -104,12 +105,17 @@ async function main(): Promise<void> {
   }
   const version = packageVersion(join(APP_ROOT, 'package.json'), 'desktop package')
   const pnpmVersion = packageVersion(join(APP_ROOT, 'node_modules', 'pnpm', 'package.json'), 'pnpm package')
+  await preparePrimaryRuntime()
+  // The development project declares the Node version its Host runs under: the primary runtime's
+  // standalone Node where it hosts the payload, and Electron's Node mode everywhere else.
+  const hostRuntime = desktopNodeRuntime(process.platform,
+    createRequire(import.meta.url)('electron') as string, developmentRuntimeDirectory())
   const release: DesktopRelease = {
     schemaVersion: 1,
     version,
     hostProtocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,
-    nodeVersion: execFileSync(createRequire(import.meta.url)('electron') as string, ['-p', 'process.versions.node'],
-      { encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }).trim(),
+    nodeVersion: execFileSync(hostRuntime.executable, ['-p', 'process.versions.node'],
+      { encoding: 'utf8', env: hostRuntime.electron ? { ...process.env, ELECTRON_RUN_AS_NODE: '1' } : process.env }).trim(),
     pnpmVersion,
   }
   prepareDevelopmentProject({
@@ -120,7 +126,6 @@ async function main(): Promise<void> {
     release,
     target: resolveDesktopBuildTarget(),
   })
-  await preparePrimaryRuntime()
   await launchElectron()
 }
 

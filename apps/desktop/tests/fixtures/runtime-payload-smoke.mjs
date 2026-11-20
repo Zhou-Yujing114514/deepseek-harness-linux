@@ -1,4 +1,4 @@
-/** Exercise filtered Desktop native and HTML dependencies under its Electron Node runtime. */
+/** Exercise filtered Desktop native and HTML dependencies under its shipped Node runtime. */
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -14,7 +14,7 @@ const runtime = process.argv[2]
 assert.ok(runtime, 'Pass the filtered resources/dsh directory')
 const root = resolve(runtime)
 const descriptor = JSON.parse(readFileSync(join(root, 'desktop-runtime.json'), 'utf8'))
-assert.equal(process.versions.node, descriptor.release.nodeVersion, 'Run with the Electron Node runtime version')
+assert.equal(process.versions.node, descriptor.release.nodeVersion, 'Run with the shipped Node runtime version')
 assert.equal(process.platform, descriptor.platform)
 assert.equal(process.arch, descriptor.arch)
 const resourcesRuntime = process.argv[3] ?? join(dirname(root), 'runtime')

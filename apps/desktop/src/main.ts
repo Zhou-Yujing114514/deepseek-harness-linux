@@ -55,6 +55,7 @@ import { DesktopPolicyTestAuth } from './policy-test-auth.ts'
 import { readDesktopSettings } from './settings.ts'
 import { DesktopUpdateDialog, type UpdateDialogOptions } from './update-dialog.ts'
 import { readDesktopRuntime } from './runtime-tree.ts'
+import { desktopNodeRuntime } from './node-environment.ts'
 import { DesktopBrowserGuests } from './browser-guests.ts'
 import { installDesktopShortcuts } from './keyboard.ts'
 import { DesktopUpdateOverlays } from './update-overlay.ts'
@@ -145,21 +146,24 @@ protocol.registerSchemesAsPrivileged([{
 
 interface RuntimeResources {
   readonly nodeBin: string
-  readonly node: string
+  /** Electron executable that runs this application. */
+  readonly electron: string
+  /** Electron resources root of the packaged installation; undefined while unpackaged. */
+  readonly resourcesPath: string | undefined
   readonly pnpm: string
   readonly dsh: string
 }
 
 function runtimeResources(): RuntimeResources {
   const development = !app.isPackaged
-  const node = process.execPath
+  const electron = process.execPath
   const nodeBin = development ? join(app.getAppPath(), 'scripts', 'node-bin') : join(process.resourcesPath, 'runtime', 'bin')
   const pnpm = (development ? process.env.DSH_DESKTOP_PNPM_ENTRY : undefined)
     ?? (development ? join(app.getAppPath(), 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
       : join(process.resourcesPath, 'runtime', 'primary-runtime', 'dependencies', 'pnpm', 'bin', 'pnpm.mjs'))
   const dsh = (development ? process.env.DSH_DESKTOP_DSH_DIR : undefined)
     ?? (development ? join(app.getAppPath(), '.desktop-build', 'development', 'project') : join(app.getAppPath(), 'dsh'))
-  return { node, nodeBin, pnpm, dsh }
+  return { electron, resourcesPath: development ? undefined : process.resourcesPath, nodeBin, pnpm, dsh }
 }
 
 function developmentPrimaryRuntime(): string {
@@ -444,7 +448,15 @@ async function main(): Promise<void> {
     () => locale.id === 'zh-CN' ? 'zh_CN' : 'en_US', process.platform === 'win32' ? 'win32' : 'darwin')
   const backend = new DesktopBackendController((onFailure) => {
     const hostInspectPort = developmentHostInspectPort(development)
-    const host = new DesktopHostProcess(resources.node, resources.dsh, activeProject,
+    const host = new DesktopHostProcess(
+      // A standalone Host (Linux) has no `process.resourcesPath`; hand it the packaged resources root
+      // so children that locate bundled packages relative to Electron's layout still find them.
+      // `exactOptionalPropertyTypes` rejects an explicit undefined, so the key exists only when set.
+      {
+        ...desktopNodeRuntime(process.platform, resources.electron, primaryRuntime),
+        ...(resources.resourcesPath === undefined ? {} : { resourcesPath: resources.resourcesPath }),
+      },
+      resources.dsh, activeProject,
       hostInspectPort, { ...hostEnvironment, DSH_CLIENT_VERSION: desktopClientVersion() }, onFailure,
       primaryRuntime,
       resources, (next) => { platformView.setSession(next) })

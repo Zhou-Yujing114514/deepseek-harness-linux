@@ -9,13 +9,14 @@ import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { readPrimaryRuntime, workspaceDependencyPaths } from '../../../packages/skill/tool-workspace-dependencies/src/index.ts'
 import { DesktopHostProcess } from '../src/host-process.ts'
+import { desktopNodeEnvironment, type DesktopNodeRuntime } from '../src/node-environment.ts'
 import { createPluginProfile } from '../src/project-manager.ts'
 import type { DesktopRuntimeDescriptor } from '../src/runtime-tree.ts'
 
 /**
  * Check CLI package operations, Host startup, its frontend, external plugins and real Office-to-PDF conversion.
  * @param root - Materialized dsh resources.
- * @param node - Prepared target Electron executable.
+ * @param node - Node runtime that will host the payload.
  * @param runtime - Verified resource descriptor.
  * @param environment - Credential-scrubbed build environment and private native cache.
  * @param resourcesRuntime - Bundled interpreters outside the application archive.
@@ -24,7 +25,7 @@ import type { DesktopRuntimeDescriptor } from '../src/runtime-tree.ts'
  * @returns Resolves after checks and teardown; rejects on a check or teardown failure.
  */
 export async function smokeDesktopRuntime(
-  root: string, node: string, runtime: DesktopRuntimeDescriptor, environment: NodeJS.ProcessEnv, resourcesRuntime: string,
+  root: string, node: DesktopNodeRuntime, runtime: DesktopRuntimeDescriptor, environment: NodeJS.ProcessEnv, resourcesRuntime: string,
   skipOfficeConversion = false,
 ): Promise<void> {
   const home = mkdtempSync(join(tmpdir(), 'dsh-desktop-smoke-'))
@@ -62,9 +63,9 @@ export function apply(ctx) {
     writeFileSync(join(installedPlugin, 'bundle.yml'), `- insert:\n    - id: ${installedName}\n      name: ${installedName}\n      inject: [webServer]\n`)
     appendFileSync(join(profile, 'pnpm-workspace.yaml'), 'offline: true\nupdateNotifier: false\n')
     const cli = join(root, 'node_modules', '@deepseek-ai', 'dsh-desktop-host', 'lib', 'cli.js')
-    const runCli = (args: string[]) => promisify(execFile)(node,
+    const runCli = (args: string[]) => promisify(execFile)(node.executable,
       ['--expose-internals', cli, 'plugin', '--profile', 'desktop', ...args],
-      { cwd: home, env: { ...hostEnvironment, ELECTRON_RUN_AS_NODE: '1' }, timeout: 120_000, windowsHide: true })
+      { cwd: home, env: desktopNodeEnvironment(node, undefined, hostEnvironment), timeout: 120_000, windowsHide: true })
     await runCli(['add', `file:${installedPlugin}`, '--offline', '--ignore-scripts'])
     const installedEntry = join(profile, 'node_modules', installedName, 'index.js')
     if (readFileSync(installedEntry, 'utf8') !== readFileSync(join(installedPlugin, 'index.js'), 'utf8')) {
