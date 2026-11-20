@@ -254,7 +254,7 @@
     "@yao-pkg/pkg": "6.21.0",
     "@yarnpkg/cli-dist": "4.18.0",
     "eslint-plugin-sonarjs": "^4.2.0",
-    "execa": "^10.0.1",
+    "execa": "^10.2.0",
     "zod": "^4.4.3",
     "extract-zip": "^2.0.1",
     "fast-check": "^4.9.0",
