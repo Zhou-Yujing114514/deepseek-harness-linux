@@ -23,7 +23,7 @@ export function ConversationContent(props: ConversationContentProps) {
   const {
     sessionId, phase, hero, useSession, useSessions, useSessionStatus,
     useWorkspaces, useInput, useComposerBlock, renderSlot, renderSlotChain,
-    selectWorkspace, t, useFactorySlot,
+    moveDraft, t, useFactorySlot,
   } = props
   const session = useSession(snapshot => snapshot)
   const Views = useFactorySlot('views', ConversationSessionView)
@@ -123,7 +123,7 @@ export function ConversationContent(props: ConversationContentProps) {
         onPick: (workspaceId) => {
           setPickerOpen(false)
           setPendingWorkspaceId(workspaceId)
-          void selectWorkspace(workspaceId).catch(() => {
+          void props.onWorkspaceSelected(workspaceId, moveDraft).catch(() => {
             setPendingWorkspaceId(current => current === workspaceId ? undefined : current)
           })
         },
@@ -146,6 +146,7 @@ export function ConversationContent(props: ConversationContentProps) {
   const blocked = !inert && composerBlock !== undefined
   const inputBar = renderSlot('conversation.composer.bar', {
     variant: hero ? 'hero' : 'composer',
+    occurrence: props.variant,
     ...(inert
       ? {
         disabled: true,
@@ -163,7 +164,7 @@ export function ConversationContent(props: ConversationContentProps) {
 
   const composerBar = (
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
-      {hero && <HeroShell t={t} renderSlot={renderSlot} />}
+      {hero && <HeroShell t={t} renderSlot={renderSlot} headline={props.headline} />}
       {hero && heroWorkspaceRow}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}
@@ -195,10 +196,15 @@ export function ConversationContent(props: ConversationContentProps) {
       data-conversation-region="chat"
       data-content-phase={phase}
     >
-      <div className={css.scrollBody} data-conversation-scroll="">
-        {sessionId === undefined ? null : <Views />}
-        {composerSeat}
-      </div>
+      {/* The frame wraps the scroll body in every phase, so leaving the home keeps the composer mounted. */}
+      {renderSlot('conversation.hero.frame', { hero: hero && props.variant !== 'embedded' }, {
+        children: (
+          <div className={css.scrollBody} data-conversation-scroll="">
+            {sessionId === undefined ? null : <Views />}
+            {composerSeat}
+          </div>
+        ),
+      })}
       <WidthControls container={body} phase={phase} />
     </div>
   )

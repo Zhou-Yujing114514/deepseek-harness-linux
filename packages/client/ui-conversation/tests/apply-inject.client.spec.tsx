@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { syncedConfig } from '@deepseek-ai/dsh-client-test-runtime'
+import { apply as applyMenus, inject as injectMenus } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import { render, cleanup } from '@testing-library/react'
 import { $getRoot, $isTextNode, PASTE_COMMAND } from 'lexical'
 import { createUserTextFixture } from './user-text-component-fixture.client.tsx'
@@ -6,15 +8,17 @@ import { registerComposerKeymap } from '../src/client/input/editor/keymap.ts'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { CommandContribution, CommandUiContract } from '@deepseek-ai/dsh-client-ui-commands/client'
+import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { ISession, SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
+import * as messageQuotes from '@deepseek-ai/dsh-message-quotes/client'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import {
   SlotTestRuntime, stubConfigForm, usePinnedBrowserLanguages,
 } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionBehaviorOverrides } from '@deepseek-ai/dsh-client-test-runtime'
 import {
-  apply, inject, type ComposerBarInjected, type ConversationInjected,
+  apply, inject, type ComposerBarInjected, type ConversationInjected, type ConversationShellInjected,
   type ConversationSessionHeaderInjected, type ConversationSessionInjected, type ViewTab,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -22,6 +26,16 @@ import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { createConversationStore } from '../src/client/stores.ts'
 import type { SessionInputShell } from '../src/client/input/facade.ts'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
+import { SessionSeq } from '@deepseek-ai/dsh-session/types'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { InboxWireState } from '@deepseek-ai/dsh-agent/types'
+import { continuationTurn } from './continuation-fixture.ts'
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    'quote-probe': { kind: 'single'; scope: 'session' }
+  }
+}
 
 usePinnedBrowserLanguages('zh-CN')
 
@@ -38,7 +52,7 @@ function sessionFakeFor() {
   } satisfies SessionBehaviorOverrides
 }
 
-async function bench() {
+async function bench(renderQuote = false) {
   const runtime = await SlotTestRuntime.create()
   const rootUpload = vi.fn(() => Promise.resolve({
     ok: true as const,
@@ -66,7 +80,7 @@ async function bench() {
   const opened = vi.fn<(id: SessionId) => void>()
   let mainReference: SessionReference | undefined
   const replaceMain = (id: SessionId, beforeOpen?: (id: SessionId) => void): void => {
-    const next = runtime.sessions.retain(id, { source: 'mainView' })
+    const next = runtime.sessions.retain(id, { source: 'mainView', facets: { conversation: true } })
     try {
       beforeOpen?.(id)
     } catch (error: unknown) {
@@ -96,11 +110,19 @@ async function bench() {
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)
+  runtime.ctx.provide('shortcuts', { catalog: createSnapshotStore([]) })
+  await runtime.mount({ inject: [...injectMenus], apply: applyMenus }, syncedConfig({ resolutionTimeoutMs: 1000 }))
   await runtime.root.declare({
     'main': { kind: 'keyed', scope: 'root' },
-  }, (_props: { renderSlot?: unknown }) => null)
+    'quote-probe': { kind: 'single', scope: 'session' },
+  }, ({ renderFactorySlot, SessionProvider }) => renderQuote ? (
+    <SessionProvider session={rootReference}>
+      {renderFactorySlot('conversation.user.text', { text: '> @literal /review', facts: {} })}
+    </SessionProvider>
+  ) : null)
 
-  const feature = await runtime.mount({ inject: [...inject], apply })
+  const feature = await runtime.mount({ inject: [...inject], apply }, syncedConfig({ busyEnter: 'queue', maxConcurrentFileUploads: 2 }))
+  if (renderQuote) await runtime.mount(messageQuotes)
   runtime.renderRoot()
   const entryOf = (key: 'main.conversation' | 'conversation.session' | 'conversation.session.header' | 'conversation.composer.bar') =>
     runtime.slots.entries(key)[0]!
@@ -118,6 +140,11 @@ async function bench() {
     return (definition.inject as unknown as (
       sessionId: SessionId | undefined,
     ) => ConversationInjected)(id)
+  }
+  /** Pick a Workspace as the main occurrence does: the shell opens it and adopts the draft of the Session shown. */
+  const selectWorkspace = (id: SessionId | undefined, workspaceId: WorkspaceId): Promise<void> => {
+    const shell = runtime.slots.spec('main.conversation') as { inject: ConversationShellInjected }
+    return shell.inject.openWorkspace(workspaceId, residentApi(id).moveDraft)
   }
   const headerApi = (id: SessionId) => {
     const entry = entryOf('conversation.session.header')
@@ -139,12 +166,142 @@ async function bench() {
   const viewSource = (id: SessionId): ObservableSnapshot<readonly ViewTab[]> =>
     conversationApi(id).injected.hooks.conversationViews
   return {
-    runtime, feature, slots: runtime.slots, entryOf, conversationApi, headerApi, residentApi, composerApi,
+    runtime, feature, slots: runtime.slots, entryOf, conversationApi, headerApi, residentApi, composerApi, selectWorkspace,
     inputApi, viewSource, sessionFake, connectWorkspace, rootUpload, uploads, rootReference, references, opened,
   }
 }
 
 describe('Conversation inject API', () => {
+  it.each(['zh', 'en'])('submits empty continuation input in the %s locale', async (locale) => {
+    const b = await bench()
+    onTestFinished(() => b.runtime.dispose())
+    await b.runtime.sessions.replaceEvents(ROOT, continuationTurn({ kind: 'error', error: { code: 'SERVER', message: 'busy' } }))
+    await b.runtime.sessions.setProjection(ROOT, 'conversationContinuation', SessionSeq(5))
+    const composer = b.composerApi(ROOT)
+    b.runtime.ctx.locale.setLocale(locale)
+    const pending = Promise.withResolvers<Awaited<ReturnType<ISession['prompt']>>>()
+    onTestFinished(() => { pending.resolve({ ok: true, value: { accepted: true } }) })
+    b.sessionFake.prompt.mockImplementationOnce(() => pending.promise)
+    composer.retry!(SessionSeq(5))
+    composer.retry!(SessionSeq(5))
+    expect(composer.keyboard!.snapshot.phase).toBe('sending')
+    await vi.waitFor(() => { expect(b.sessionFake.prompt).toHaveBeenCalledOnce() })
+    expect(b.sessionFake.prompt.mock.calls[0]?.[0]).toEqual([])
+    expect(b.sessionFake.prompt.mock.calls[0]?.[1]).toBe('queue')
+    pending.resolve({ ok: true, value: { accepted: true } })
+    await vi.waitFor(() => { expect(composer.keyboard!.snapshot.phase).toBe('plain') })
+    expect(composer.keyboard!.snapshot.draft).toBe('')
+  })
+
+  it('rechecks the addressed failure, draft, and live activity before continuing', async () => {
+    const b = await bench()
+    onTestFinished(() => b.runtime.dispose())
+    await b.runtime.sessions.replaceEvents(ROOT, continuationTurn({ kind: 'error', error: { code: 'TIMEOUT', message: 'timeout' } }))
+    await b.runtime.sessions.setProjection(ROOT, 'conversationContinuation', SessionSeq(5))
+    const composer = b.composerApi(ROOT)
+    const input = b.inputApi(ROOT)
+    composer.retry!(SessionSeq(1))
+    input.actions.setDraft('Keep my new instruction')
+    composer.retry!(SessionSeq(5))
+    expect(input.state.getSnapshot().draft).toBe('Keep my new instruction')
+    input.actions.setDraft('')
+    await b.runtime.sessions.updateSessionSnapshot(ROOT, (state) => { state.running = true })
+    composer.retry!(SessionSeq(5))
+    await b.runtime.sessions.updateSessionSnapshot(ROOT, (state) => { state.running = false })
+    await b.runtime.sessions.appendEvent(ROOT, {
+      type: 'event', event: { type: 'turn/start', seq: SessionSeq(6), time: 1, data: { turn: 2 } },
+    })
+    await b.runtime.sessions.setProjection(ROOT, 'conversationContinuation', null)
+    composer.retry!(SessionSeq(5))
+    expect(input.state.getSnapshot().draft).toBe('')
+    expect(b.sessionFake.prompt).not.toHaveBeenCalled()
+  })
+
+  it('keeps continuation available with injected mode context but excludes pending human steering', async () => {
+    const b = await bench()
+    onTestFinished(() => b.runtime.dispose())
+    await b.runtime.sessions.setProjection(ROOT, 'conversationContinuation', SessionSeq(5))
+    const composer = b.composerApi(ROOT)
+    const context = { id: 'context', role: 'user', content: [{ type: 'text', text: 'approval policy context' }], source: { kind: 'user-approval' } }
+    const inbox: InboxWireState = { 'next-turn': [], 'next-step': [context] }
+    await b.runtime.sessions.setProjection(ROOT, 'inbox', inbox)
+    const user = createUserMessage({ content: [{ type: 'text', text: 'new instruction' }], source: { kind: 'user' } })
+    await b.runtime.sessions.setProjection(ROOT, 'inbox', { ...inbox, 'next-step': [context, user] })
+    composer.retry!(SessionSeq(5))
+    expect(b.sessionFake.prompt).not.toHaveBeenCalled()
+    await b.runtime.sessions.setProjection(ROOT, 'inbox', inbox)
+    composer.retry!(SessionSeq(5))
+    await vi.waitFor(() => { expect(b.sessionFake.prompt).toHaveBeenCalledOnce() })
+    expect(b.sessionFake.prompt.mock.calls[0]?.[0]).toEqual([])
+  })
+
+  it.each(['next-turn', 'pending', 'block', 'attachment', 'subagent', 'removed', 'closed'] as const)(
+    'rejects a stale continuation click after %s changes', async (condition) => {
+      const b = await bench()
+      onTestFinished(() => b.runtime.dispose())
+      await b.runtime.sessions.setProjection(ROOT, 'conversationContinuation', SessionSeq(5))
+      const composer = b.composerApi(ROOT)
+      switch (condition) {
+        case 'pending':
+          await b.runtime.sessions.updateSessionSnapshot(ROOT, (state) => { state.pendingSubmissions = [{ requestId: 'pending' as SessionRequestId, placement: 'transcript', time: 0, text: 'newer message', attachments: [] }] })
+          break
+        case 'next-turn':
+          await b.runtime.sessions.setProjection(ROOT, 'inbox', { 'next-turn': [createUserMessage({ content: [{ type: 'text', text: 'queued' }], source: { kind: 'user' } })], 'next-step': [] })
+          break
+        case 'block':
+          b.runtime.ctx.conversation.blocks.set(ROOT, { reason: 'Choose a model' })
+          break
+        case 'attachment':
+          expect(composer.addFiles?.([new File([Uint8Array.of(1)], 'draft.pdf', { type: 'application/pdf' })])).toBeNull()
+          break
+        case 'subagent':
+          await b.runtime.sessions.updateSessionSnapshot(ROOT, (state) => { state.subagent = { address: { parentSessionId: ROOT, childSessionId: ROOT, mode: 'continuable' } } })
+          break
+        case 'removed':
+          await b.runtime.sessions.updateSessionSnapshot(ROOT, (state) => { state.removed = true })
+          break
+        case 'closed':
+          await b.runtime.sessions.updateSessionSnapshot(ROOT, (state) => { state.openState = 'error' })
+          break
+      }
+      const before = b.inputApi(ROOT).state.getSnapshot().draft
+      composer.retry!(SessionSeq(5))
+      expect(b.inputApi(ROOT).state.getSnapshot().draft).toBe(before)
+      expect(b.sessionFake.prompt).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each(['refused', 'failed'] as const)('keeps continuation input empty and exposes submission failure when %s', async (outcome) => {
+    const b = await bench()
+    onTestFinished(() => b.runtime.dispose())
+    await b.runtime.sessions.setProjection(ROOT, 'conversationContinuation', SessionSeq(5))
+    const composer = b.composerApi(ROOT)
+    if (outcome === 'refused') b.sessionFake.prompt.mockImplementationOnce(async () => {
+      const error = new RemoteError('gateway/internal', 'request refused', {})
+      await b.runtime.sessions.updateSessionSnapshot(ROOT, (state) => { state.promptError = { op: 'send', error } })
+      return { ok: false, error }
+    })
+    else b.sessionFake.prompt.mockRejectedValueOnce(new Error('connection lost'))
+    composer.retry!(SessionSeq(5))
+    await vi.waitFor(() => { expect(b.sessionFake.prompt).toHaveBeenCalledOnce(); expect(composer.keyboard!.snapshot.phase).toBe('plain') })
+    expect(composer.keyboard!.snapshot.draft).toBe('')
+    if (outcome === 'refused') expect(b.runtime.sessions.binding(ROOT)!.session.getSnapshot().promptError?.error.message).toBe('request refused')
+    else expect(composer.hooks.notices.getSnapshot()).toMatchObject({ level: 'error', text: 'connection lost' })
+    composer.retry!(SessionSeq(5))
+    await vi.waitFor(() => { expect(b.sessionFake.prompt).toHaveBeenCalledTimes(2) })
+  })
+
+  it('renders literal quote text through the actual Factory and keyed node registration', async () => {
+    const b = await bench(true)
+    onTestFinished(() => b.runtime.dispose())
+    const errors = vi.fn()
+    const unsubscribe = b.slots.onEntryError(errors)
+    onTestFinished(unsubscribe)
+    await vi.waitFor(() => { expect(document.querySelector('[data-quote-preview-text]')?.textContent).toBe('@literal /review') })
+    expect(document.querySelector('[data-slot-error]')).toBeNull()
+    expect(errors).not.toHaveBeenCalled()
+  })
+
   it('owns the File action, reads its mounted composer availability, and unregisters on disposal', async () => {
     const b = await bench()
     onTestFinished(() => b.runtime.dispose())
@@ -324,7 +481,7 @@ describe('Conversation inject API', () => {
       expect(activate).toHaveBeenLastCalledWith('custom')
       activate.mockClear()
 
-      using mainReference = b.runtime.sessions.retain(ROOT, { source: 'mainView' })
+      using mainReference = b.runtime.sessions.retain(ROOT, { source: 'mainView', facets: { conversation: true } })
       await b.runtime.flush()
       expect(mainReference.sessionId).toBe(ROOT)
       expect(activate).not.toHaveBeenCalled()
@@ -346,14 +503,15 @@ describe('Conversation inject API', () => {
 
     actions.setDraft('hello')
     actions.submit()
-    // Optimistic commit clears the draft at enter; the prompt lands after the
-    // paint-yield inside the send pipeline.
-    expect(state.getSnapshot().draft).toBe('')
+    // The draft stays, read-only, until the Host accepts the prompt that
+    // follows the paint-yield inside the send pipeline.
+    expect(state.getSnapshot()).toMatchObject({ phase: 'sending', draft: 'hello' })
     await vi.waitFor(() => {
       expect(b.sessionFake.prompt).toHaveBeenCalledWith(
         [{ type: 'text', text: 'hello' }], 'queue', expect.any(AbortSignal), expect.any(String),
       )
     })
+    await vi.waitFor(() => { expect(state.getSnapshot().draft).toBe('') })
 
     b.sessionFake.prompt.mockResolvedValueOnce({
       ok: false, error: new RemoteError('session/agent-busy', 'busy', { reason: 'busy' }),
@@ -513,7 +671,6 @@ describe('Conversation inject API', () => {
 
   it('moves a draft only when Workspace navigation changes Session', async () => {
     const b = await bench()
-    const resident = b.residentApi(ROOT)
     const { state, actions } = b.inputApi(ROOT)
     actions.setDraft('carry me')
     expect(b.composerApi(ROOT).addFiles?.([
@@ -522,7 +679,7 @@ describe('Conversation inject API', () => {
     await vi.waitFor(() => { expect(b.rootUpload).toHaveBeenCalledOnce() })
 
     b.connectWorkspace.mockResolvedValueOnce(ROOT)
-    await resident.selectWorkspace('workspace-1' as WorkspaceId)
+    await b.selectWorkspace(ROOT, 'workspace-1' as WorkspaceId)
     expect(b.opened).toHaveBeenCalledWith(ROOT)
     expect(state.getSnapshot().draft).toBe('carry me')
 
@@ -537,12 +694,33 @@ describe('Conversation inject API', () => {
     b.uploads.set(other, targetUpload)
     await b.runtime.sessions.add({ id: other, session: {} })
     b.connectWorkspace.mockResolvedValueOnce(other)
-    await resident.selectWorkspace('workspace-2' as WorkspaceId)
+    await b.selectWorkspace(ROOT, 'workspace-2' as WorkspaceId)
     expect(b.opened).toHaveBeenCalledWith(other)
     expect(state.getSnapshot().draft).toBe('')
     expect(b.inputApi(other).state.getSnapshot().draft).toBe('carry me')
     await vi.waitFor(() => { expect(targetUpload).toHaveBeenCalledOnce() })
     expect(b.inputApi(other).state.getSnapshot().attachmentIds).toHaveLength(1)
+    await b.runtime.dispose()
+  })
+
+  it('leaves a draft whose message is still being sent with its Session', async () => {
+    const b = await bench()
+    const pending = Promise.withResolvers<Awaited<ReturnType<ISession['prompt']>>>()
+    b.sessionFake.prompt.mockReturnValueOnce(pending.promise)
+    const { state, actions } = b.inputApi(ROOT)
+    actions.setDraft('in flight')
+    actions.submit()
+    await vi.waitFor(() => { expect(b.sessionFake.prompt).toHaveBeenCalledOnce() })
+    expect(state.getSnapshot().phase).toBe('sending')
+    const other = 'sending-target' as SessionId
+    await b.runtime.sessions.add({ id: other, session: {} })
+    b.connectWorkspace.mockResolvedValueOnce(other)
+    await b.selectWorkspace(ROOT, 'workspace-sending' as WorkspaceId)
+    expect(b.opened).toHaveBeenCalledWith(other)
+    expect(b.inputApi(other).state.getSnapshot().draft).toBe('')
+    expect(state.getSnapshot().draft).toBe('in flight')
+    pending.resolve({ ok: true, value: { accepted: true } })
+    await vi.waitFor(() => { expect(state.getSnapshot()).toMatchObject({ phase: 'plain', draft: '' }) })
     await b.runtime.dispose()
   })
 
@@ -558,7 +736,7 @@ describe('Conversation inject API', () => {
     const other = 'structured-target' as SessionId
     await b.runtime.sessions.add({ id: other, session: {} })
     b.connectWorkspace.mockResolvedValueOnce(other)
-    await b.residentApi(ROOT).selectWorkspace('workspace-structured' as WorkspaceId)
+    await b.selectWorkspace(ROOT, 'workspace-structured' as WorkspaceId)
     expect(b.inputApi(other).state.getSnapshot().draft).toBe(draft.text)
     expect(b.inputApi(other).state.getSnapshot().occurrences).toMatchObject(draft.references)
     expect(b.inputApi(ROOT).state.getSnapshot().draft).toBe('')
@@ -569,12 +747,12 @@ describe('Conversation inject API', () => {
   it('supports no-Session navigation and propagates Workspace connection failure', async () => {
     const b = await bench()
     b.connectWorkspace.mockResolvedValueOnce(ROOT)
-    await b.residentApi(undefined).selectWorkspace('workspace-0' as WorkspaceId)
+    await b.selectWorkspace(undefined, 'workspace-0' as WorkspaceId)
     expect(b.opened).toHaveBeenCalledWith(ROOT)
 
     const opens = b.opened.mock.calls.length
     b.connectWorkspace.mockRejectedValueOnce(new Error('offline'))
-    await expect(b.residentApi(ROOT).selectWorkspace('workspace-4' as WorkspaceId))
+    await expect(b.selectWorkspace(ROOT, 'workspace-4' as WorkspaceId))
       .rejects.toThrow('offline')
     expect(b.opened).toHaveBeenCalledTimes(opens)
     await b.runtime.dispose()

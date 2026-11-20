@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { syncedConfig } from '@deepseek-ai/dsh-client-test-runtime'
+import { apply as applyMenus, inject as injectMenus } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import { describe, expect, it, vi } from 'vitest'
 import {
   SlotTestRuntime, stubConfigForm, usePinnedBrowserLanguages,
@@ -6,7 +8,7 @@ import {
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { apply, inject, type ViewTab } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { apply, inject, type ConversationShellInjected, type ViewTab } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 usePinnedBrowserLanguages('zh-CN')
 
@@ -25,13 +27,15 @@ async function bench(options: { declareConversation?: boolean } = {}) {
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)
+  runtime.ctx.provide('shortcuts', { catalog: createSnapshotStore([]) })
+  await runtime.mount({ inject: [...injectMenus], apply: applyMenus }, syncedConfig({ resolutionTimeoutMs: 1000 }))
   if (options.declareConversation !== false) {
     await runtime.root.declare({
       'main': { kind: 'keyed', scope: 'root' },
       'settings.general.item': { kind: 'list', scope: 'root' },
     }, (_props: { renderSlot?: unknown }) => null)
   }
-  const feature = await runtime.mount({ inject: [...inject], apply })
+  const feature = await runtime.mount({ inject: [...inject], apply }, syncedConfig({ busyEnter: 'queue', maxConcurrentFileUploads: 2 }))
   if (options.declareConversation !== false) runtime.renderRoot()
   return { runtime, feature, developerTools }
 }
@@ -44,6 +48,35 @@ function entry(
 }
 
 describe('target-neutral Conversation apply wiring', () => {
+  it('hands every Session header the same in-memory View pins without restoring saved choices', async () => {
+    localStorage.setItem('dsh.slot.manual-order.conversation.view.v1', JSON.stringify({ unpinned: ['trajectory'] }))
+    try {
+      const b = await bench()
+      const header = b.runtime.slots.entries('conversation.session.header')[0]!
+      type PinHooks = {
+        hooks: { entryPins: ObservableSnapshot<readonly string[]>; entryActions: ObservableSnapshot<boolean> }
+        setPinned: (id: string, pinned: boolean) => void
+      }
+      const inject = header.inject as (sessionId: SessionId) => PinHooks
+      const injected = inject(SID)
+      const first = injected.hooks.entryPins
+      expect(first.getSnapshot()).toEqual([])
+      expect(inject('session-2' as SessionId).hooks.entryPins).toBe(first)
+      injected.setPinned('timeline', false)
+      expect(first.getSnapshot()).toEqual(['timeline'])
+      const actions = injected.hooks.entryActions
+      const changed = vi.fn()
+      actions.subscribe(changed)
+      expect(actions.getSnapshot()).toBe(false)
+      b.runtime.slots.register({ name: 'conversation.session.header.views.actions', id: 'probe' }, (() => null) as never)
+      expect(actions.getSnapshot()).toBe(true)
+      await vi.waitFor(() => { expect(changed).toHaveBeenCalled() })
+      await b.runtime.dispose()
+    } finally {
+      localStorage.clear()
+    }
+  })
+
   it('hides only the Trajectory View while developer tools are disabled and restores it when enabled', async () => {
     const b = await bench()
     const header = b.runtime.slots.entries('conversation.session.header')[0]!
@@ -70,8 +103,9 @@ describe('target-neutral Conversation apply wiring', () => {
     b.runtime.renderRoot()
     expect(b.runtime.slots.entries('main').map(row => row.options.key)).toEqual(['conversation'])
     expect(b.runtime.slots.entries('main.conversation')).toHaveLength(1)
-    expect(b.runtime.slots.spec('main.conversation'))
-      .toEqual({ kind: 'single', scope: 'session-maybe' })
+    const shell = b.runtime.slots.spec('main.conversation') as { inject: ConversationShellInjected }
+    expect(shell.inject.openWorkspace).toBeTypeOf('function')
+    expect(shell).toEqual({ kind: 'single', scope: 'session-maybe', inject: shell.inject })
     expect(b.runtime.factoryOf('conversation.content').slots)
       .toMatchObject({ views: { scope: 'session' } })
     expect(b.runtime.slots.entries('conversation.session')).toHaveLength(1)

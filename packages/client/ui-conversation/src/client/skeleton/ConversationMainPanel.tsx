@@ -11,7 +11,7 @@ const CONTENT_SLOTS = { widthControls: ConversationWidthControls }
  * @returns the unchanged root, Header, content, and width-control subtree.
  */
 export function ConversationMainPanel(props: ConversationSlotProps) {
-  const { sessionId, useSession, useSessions, useConversation, renderSlot, renderFactorySlot } = props
+  const { sessionId, useSession, useSessions, useConversation, renderSlot, renderFactorySlot, openWorkspace } = props
   const session = useSession(s => s)
   const conversation = useConversation(s => s)
   const shellPhase = session === undefined || conversation === undefined
@@ -29,15 +29,7 @@ export function ConversationMainPanel(props: ConversationSlotProps) {
   // The exemption is deliberately open-state-wide, not loading-only: a
   // summary-blank session is the hero before its open starts (`cold`) and
   // after one fails (`error`) for the same reason — there is no history.
-  // A restored continuable subagent waits for a Host summary to establish
-  // parent availability. This keeps the composer
-  // hidden instead of briefly rendering the parent-offline takeover.
-  const parentAvailabilityPending = session?.subagent?.address.mode === 'continuable'
-    && session.subagent.parentAvailable === undefined
-  const settling = sessionId !== undefined && (
-    (shellPhase === 'blank' && openState === 'loading' && summaryBlank !== true)
-    || parentAvailabilityPending
-  )
+  const settling = sessionId !== undefined && shellPhase === 'blank' && openState === 'loading' && summaryBlank !== true
   const hero = sessionId === undefined
     || (shellPhase === 'blank' && (openState === 'open' || summaryBlank === true))
   const phase = settling ? 'settling' : hero ? 'hero' : 'active'
@@ -49,6 +41,7 @@ export function ConversationMainPanel(props: ConversationSlotProps) {
         variant: 'main',
         phase,
         hero,
+        onWorkspaceSelected: openWorkspace,
       }, {
         slots: CONTENT_SLOTS,
       })}

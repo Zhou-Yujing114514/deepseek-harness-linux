@@ -45,13 +45,22 @@ kind: "package-reference"
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `mode` | `read-only` | 会话起始的部署默认模式，加载时验证 |
-| `workspaceRoot` | `process.cwd()` | 无 agent 调用或没有 cwd 的会话所用的绝对回退根目录；相对值在加载时拒绝。普通 agent 调用使用会话的不可变 cwd |
+| `workspaceRoot` | `process.cwd()` | 无 agent 调用所用的绝对回退根目录；未挂载工作目录服务时，header 没有目录的会话也使用它；相对值在加载时拒绝。普通 agent 调用使用会话的工作目录；根为相对路径或含 NUL 字节时调用以 `SANDBOX_INVALID_ROOT` 失败 |
+| `additionalWritableRoots` | `[]` | 在 `workspace-write` 下额外允许写入的物理绝对目录；Windows 文件工具执行这些授权，Windows 子进程忽略它们，`read-only` 不授予访问权限 |
+
+会话的工作区根是它所在的目录，读取自[工作目录服务](../../session/working-directory/README.zh.md)：Host 每次移动 Session 的目录（例如进入或离开 worktree），边界都随之移动。对于关联的 Git worktree，仓库的 Git 目录位于该根之外，因此在 `workspace-write` 下写入它的 Git 命令会被拒绝，直到有授权覆盖它：部署可以通过 `additionalWritableRoots` 向所有会话授权，Host 插件可以通过 `registerWritableRoot` 向单个 live Session 授权。调用方必须显式选择该目录；策略不会读取 Git 文件或授权父检出目录。这些授权是组合中所有会话共享的部署配置，而非保存的 Session 权限。授权整个 Git 目录也允许修改钩子和配置，后续主机 Git 调用可能在沙箱之外执行它们；仅对可信任务使用此授权。使用物理绝对目录路径。执行限制的主机在每次调用时拒绝不存在的路径、非目录和符号链接目录，包括两次调用之间被替换为符号链接的目录。远端授权在远端主机上验证。
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-sandbox-policy)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
+### 注册会话的可写目录
+
+插件通过自己的所属上下文调用 `ctx.sandboxPolicy.registerWritableRoot(session, directory)`，为该活跃 Session 的 `workspace-write` 权限添加一个物理绝对目录。该方法返回原始 Cordis effect 清理函数；插件卸载或显式清理只移除该次注册。重复注册与配置授权彼此独立。将会话专用插件挂载在 Agent 的上下文下，使其 effect 也随 Agent 结束。注册时验证路径写法；操作使用该授权前，目录必须已存在于执行主机上。路径检查与配置根目录相同。
+
+注册与清理影响后续策略解析及下一次模型请求中记录的上下文。其他 Session（包括子 agent 的 Session）与无 agent 调用不会获得此授权。授权不随 Session 历史保存或继承；恢复或派生的 Session 需要自行注册。已经解析策略的操作与持久进程保留原权限，包括注册已被移除的目录。启动新进程才能使用当前授权。`read-only` 仍然只读。在 Windows 上，`write` 与 `edit` 执行额外目录授权，受沙箱限制的进程则忽略这些授权，保留工作区与私有临时目录访问权限；参见 [sandbox-local](../sandbox-local/README.zh.md#known-limitations-and-deferred-work)。
+
 ### 切换会话模式
 
-会话的模式可以在运行时通过 UI 策略控件或显式切换来更改；切换记录在会话日志中，并在该会话的下一次受限调用时生效。切换通过回放跨重启保留，每个会话保持自己的模式——两个会话绝不会看到彼此状态。切换后的会话继续以不可变的工作区 cwd 作为写入边界。
+会话的模式可以在运行时通过 UI 策略控件或显式切换来更改；切换记录在会话日志中，并在该会话的下一次受限调用时生效。切换通过回放跨重启保留，每个会话保持自己的模式——两个会话绝不会看到彼此状态。切换后的会话继续以其工作区根作为写入边界。
 
 ### 失败与恢复
 
@@ -69,15 +78,15 @@ kind: "package-reference"
 
 ### 解析优先级
 
-`resolve({ session, mode })` 返回一份完整的逐调用策略：已批准的显式模式优先于会话最后一条 `sandbox/mode` 事件，后者又优先于部署默认值。会话的不可变 `cwd` 提供工作区根目录；否则使用配置的回退值。执行环境中的绝对路径写法保持不变。执行限制的提供方在自己的文件系统上规范化根目录，因此远端 `symlink/..` 路径绝不会在 Harness 主机上解析。
+`resolve({ session, mode })` 返回一份完整的逐调用策略：已批准的显式模式优先于会话最后一条 `sandbox/mode` 事件，后者又优先于部署默认值。工作目录服务给出的会话目录提供工作区根目录；没有该服务时依次使用 header 目录和配置的根。执行环境中的绝对路径写法保持不变。执行限制的提供方在自己的文件系统上规范化根目录，因此远端 `symlink/..` 路径绝不会在 Harness 主机上解析。
 
 ### 逐会话存储
 
-运行时切换是在对应会话日志中追加的一条仅写入日志的 `sandbox/mode` 事件——切换本身就是事件，任何机制都不会在带外修改模式状态。`effective = explicit grant ?? fold(events) ?? deployment default`，因此覆盖通过回放跨重启保留，两个会话也绝不会看到彼此状态。工作区标识无需事件：创建时记录的不可变 `SessionHeader.cwd` 是该会话每次调用使用的根。事件仍只进入日志；在每次请求前，归属方会把当前事实贡献给完整运行时上下文快照，agent loop（智能体循环）将该快照记录为一条带来源的 `user/message`。
+运行时切换是在对应会话日志中追加的一条仅写入日志的 `sandbox/mode` 事件——切换本身就是事件，任何机制都不会在带外修改模式状态。`effective = explicit grant ?? fold(events) ?? deployment default`，因此覆盖通过回放跨重启保留，两个会话也绝不会看到彼此状态。工作区标识无需自己的事件：工作目录服务的 `workingDirectory` 投影给出该会话每次调用使用的根。事件仍只进入日志；在每次请求前，归属方会把当前事实贡献给完整运行时上下文快照，agent loop（智能体循环）将该快照记录为一条带来源的 `user/message`。
 
 ### 模型可见文本
 
-`sandbox:policy` 贡献说明该模式与具体能力无关的文件操作约定，以及 `workspace-write` 下已记录的会话工作区。它不枚举已挂载能力；工具插件保留特定于操作的拒绝与升权引导，批准策略单独贡献给同一份快照，计划引导仍由 `dsh-plan-mode` 的系统段落管理。
+`sandbox:policy` 贡献说明该模式与具体能力无关的文件操作约定，以及 `workspace-write` 下已记录的会话工作区和显式额外目录。它不枚举已挂载能力；工具插件保留特定于操作的拒绝与升权引导，批准策略单独贡献给同一份快照，计划引导仍由 `dsh-plan-mode` 的系统段落管理。
 
 ### 源码地图
 
@@ -122,6 +131,12 @@ Current DSH file policy: read-only. Any available operation enforced by the DSH 
 Current DSH file policy: workspace-write. Any available operation enforced by the DSH file sandbox may modify files under the session workspace: "<workspace root>". Some platform temporary areas may also be writable.
 ```
 
+##### 带额外目录的工作区写入
+
+```markdown
+Current DSH file policy: workspace-write. Any available operation enforced by the DSH file sandbox may modify files under the session workspace: "<workspace root>". Additional writable directories: ["/repo/.git"]. On Windows, these additional grants apply to file tools only, not sandboxed processes. Some platform temporary areas may also be writable.
+```
+
 ##### 完全访问
 
 ```markdown
@@ -130,7 +145,7 @@ Current DSH file policy: danger-full-access. The DSH file sandbox does not restr
 
 #### Token 影响
 
-首次请求和有效策略每次变化时增加一条简洁的持久上下文消息；未变化的请求不增加内容。`workspace-write` 只携带已记录的会话工作区路径；平台特定的临时路径会以摘要表述，不会加入依赖主机的字节。
+首次请求和有效策略每次变化时增加一条简洁的持久上下文消息；未变化的请求不增加内容。`workspace-write` 携带已记录的会话工作区路径以及显式指定的额外目录；平台特定的临时路径会以摘要表述，不会加入依赖主机的字节。
 
 #### KV Cache 影响
 
@@ -143,7 +158,7 @@ Current DSH file policy: danger-full-access. The DSH file sandbox does not restr
 
 这些限制界定了本包提供的策略范围。它们是当前的包级约束，并非通用沙箱对比，也不是待办事项清单。
 
-- **每个会话只有一个主要工作区根目录**——策略解析 `SessionHeader.cwd`；额外可写根目录不属于 `SandboxExecutionPolicy`。
+- **运行时授权不持久化**——配置目录由各会话共享；effect 注册属于一个存活 Session，恢复或派生后必须重新注册。后端支持情况见 [sandbox-local](../sandbox-local/README.zh.md)。
 - **仅限文件操作模式**——`SandboxMode` 管控文件操作；网络和进程策略不在其词汇中，因此这里没有限制它们的旋钮。
 - **有意概述临时区域**——强制执行后端会授予不同的平台临时区域，这些区域在策略解析后才会选定，因此无法在当前上下文中如实枚举。
 

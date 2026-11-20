@@ -247,7 +247,7 @@ describe.skipIf(process.platform === 'win32')('Web sidebar terminal', () => {
     expect(tripwire.pageErrors).toEqual([])
   })
 
-  it('starts in the current directory while earlier terminals and sandbox roots stay independent', async () => {
+  it('starts in the current directory while earlier terminals keep theirs and the sandbox root follows the directory', async () => {
     onTestFailed(() => saveFailureShot(page, 'sidebar-terminal-directory'))
     const agent = scaffold.ctx.agents.list()[0]!
     const directories = agent.ctx.get('workingDirectory')
@@ -262,6 +262,7 @@ describe.skipIf(process.platform === 'win32')('Web sidebar terminal', () => {
     if (sandbox === undefined) throw new Error('Session sandbox provider is missing')
     const confine = vi.spyOn(sandbox, 'confine')
     const selected = await directories.set(agent, child)
+    expect(sandboxPolicy.resolve({ session: agent.session })).toEqual({ ...policy, workspaceRoot: selected })
 
     await openTerminal(page)
     const firstProcess = processIdentity(0)
@@ -478,10 +479,18 @@ describe.skipIf(process.platform === 'win32')('Web sidebar terminal', () => {
       .filter(key => key.startsWith('dsh.terminal.binding.v1.')).map(key => localStorage.getItem(key)))
     const saved = await bindings()
     expect(saved).toHaveLength(2)
+    const closed = Promise.withResolvers<undefined>()
+    const close = scaffold.ctx.terminalController.close.bind(scaffold.ctx.terminalController)
+    vi.spyOn(scaffold.ctx.terminalController, 'close').mockImplementation((agent, id) => {
+      const result = close(agent, id)
+      closed.resolve(result.then(() => undefined))
+      return result
+    })
     const selected = second.locator('[data-dockkit-tab][aria-selected="true"]')
     await selected.hover()
-    await selected.locator('[data-dockkit-tab-close]').click()
-    await expect.poll(() => alive(secondProcess)).toBe(false)
+    // Tab removal starts background cleanup; the Host promise includes process termination.
+    await Promise.all([selected.locator('[data-dockkit-tab-close]').click(), closed.promise])
+    expect(alive(secondProcess)).toBe(false)
     expect(alive(firstProcess)).toBe(true)
     await expect.poll(() => bindings()).toHaveLength(1)
     expect(saved).toContain((await bindings())[0])
@@ -673,7 +682,7 @@ describe.skipIf(process.platform === 'win32')('Web sidebar terminal', () => {
     await expect.poll(() => page.locator('.xterm-rows:visible').innerText()).toContain('RECONNECT_READY')
     const transport = await controlTransport(page)
     await page.reload({ waitUntil: 'load' })
-    await expect.poll(() => page.locator('.xterm-rows:visible').innerText()).toContain('RECONNECT_READY')
+    await page.locator('.xterm-rows:visible').filter({ hasText: 'RECONNECT_READY' }).waitFor({ timeout: 30_000 })
     await transport.disconnect()
     const reconnect = page.getByRole('button', { name: 'Reconnect', exact: true })
     await reconnect.waitFor()
