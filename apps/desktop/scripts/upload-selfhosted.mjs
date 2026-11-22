@@ -178,20 +178,34 @@ async function embeddedBlockMapSize(path) {
   }
 }
 
+/** Installer extensions electron-updater can select on Linux; tar.gz is portable-only. */
+const LINUX_UPDATER_ARTIFACT = /\.(?:deb|rpm|pacman)$/u
+
 /**
  * Render one channel manifest matching the electron-builder generic provider schema.
+ *
+ * Every Linux desktop package type reads the same manifest, so it has to advertise
+ * an installer for each of them. The AppImage stays first because it owns the
+ * top-level `path`/`sha512`/`blockMapSize` fields that the AppImage updater reads;
+ * deb/rpm/pacman entries follow with their own checksum and size.
+ *
  * @param {string} version - Product version the manifest advertises.
- * @param {string} filename - Artifact file name the client should download.
- * @param {string} digest - Base64 sha512 of the artifact, as electron-updater verifies it.
- * @param {number} size - Byte length of the artifact.
+ * @param {string} filename - Primary AppImage file name the client should download.
+ * @param {string} digest - Base64 sha512 of the AppImage, as electron-updater verifies it.
+ * @param {number} size - Byte length of the AppImage.
  * @param {number} [blockMapSize] - Byte length of the block map appended to the AppImage. When
  *   present, electron-updater performs a differential download instead of pulling the full artifact.
+ * @param {ReadonlyArray<{ filename: string, digest: string, size: number }>} [additionalFiles]
+ *   Other installers (deb/rpm/pacman) the same version publishes.
  * @returns {string} YAML manifest text for the generic provider.
  */
-export function channelManifest(version, filename, digest, size, blockMapSize) {
+export function channelManifest(version, filename, digest, size, blockMapSize, additionalFiles = []) {
   const entry = {
     version,
-    files: [{ url: filename, sha512: digest, size }],
+    files: [
+      { url: filename, sha512: digest, size },
+      ...additionalFiles.map((file) => ({ url: file.filename, sha512: file.digest, size: file.size })),
+    ],
     path: filename,
     sha512: digest,
     releaseDate: new Date().toISOString(),
@@ -781,14 +795,23 @@ export async function uploadSelfHostedTarget(argv) {
   const { appImage, others } = await discoverArtifacts(artifactsRoot, version, arch)
   const size = await fileSize(join(artifactsRoot, appImage))
   const digest = await sha512(join(artifactsRoot, appImage))
-  process.stdout.write(`desktop self-hosted upload: ${target} ${version} ${appImage} (${size} bytes)\n`)
+  // deb clients select the .deb entry from the same manifest; a manifest carrying
+  // only the AppImage leaves DebUpdater with no file to download (issue #41).
+  const additionalFiles = await Promise.all(others.filter((name) => LINUX_UPDATER_ARTIFACT.test(name))
+    .map(async (name) => ({
+      filename: name,
+      digest: await sha512(join(artifactsRoot, name)),
+      size: await fileSize(join(artifactsRoot, name)),
+    })))
+  process.stdout.write(`desktop self-hosted upload: ${target} ${version} ${appImage} (${size} bytes)`
+    + `${additionalFiles.length === 0 ? '' : ` + ${additionalFiles.map((file) => file.filename).join(', ')}`}\n`)
 
   // electron-builder appends the compressed block map to the AppImage itself rather than
   // writing a companion .blockmap file; advertising its size is what lets electron-updater
   // download only the changed blocks (audit P-01).
   const blockMapSize = await embeddedBlockMapSize(join(artifactsRoot, appImage)).catch(() => undefined)
   const suffix = arch === 'x64' ? '' : `-${arch}`
-  const manifest = channelManifest(version, appImage, digest, size, blockMapSize)
+  const manifest = channelManifest(version, appImage, digest, size, blockMapSize, additionalFiles)
   const metadata = {
     [`nightly-linux${suffix}.yml`]: manifest,
     [`latest-linux${suffix}.yml`]: manifest,
