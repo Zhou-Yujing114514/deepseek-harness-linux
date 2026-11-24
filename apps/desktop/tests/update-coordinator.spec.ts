@@ -47,11 +47,31 @@ describe('desktop release metadata', () => {
 const coordinators: InstanceType<typeof DesktopUpdateCoordinator>[] = []
 afterEach(() => { for (const item of coordinators.splice(0)) item.dispose() })
 
-function fixture(channel: 'nightly' | 'latest' = 'nightly', version = '1.1.0-alpha.1') {
+interface FeedFile {
+  readonly url: string
+  readonly sha512: string
+  readonly size: number
+}
+
+interface FeedInfo {
+  readonly version: string
+  readonly files?: readonly FeedFile[]
+  readonly path?: string
+}
+
+function fixture(
+  channel: 'nightly' | 'latest' = 'nightly',
+  version = '1.1.0-alpha.1',
+  UpdaterClass: new () => EventEmitter = EventEmitter,
+  updateInfo: FeedInfo = { version: '1.1.0-rc.2' },
+) {
   const events = new EventEmitter()
+  // Keep the shared emitter so tests can drive updater events, while presenting the
+  // constructor name electron-updater uses to select the packaged target.
+  if (UpdaterClass !== EventEmitter) Object.defineProperty(events, 'constructor', { value: UpdaterClass })
   const checkForUpdates = vi.fn(async () => ({
     isUpdateAvailable: true,
-    updateInfo: { version: '1.1.0-rc.2' },
+    updateInfo,
   }))
   const downloadUpdate = vi.fn(async () => {
     events.emit('download-progress', { percent: 58 })
@@ -165,6 +185,37 @@ describe('desktop update coordinator', () => {
     await f.coordinator.check(true)
     expect(f.checkForUpdates).toHaveBeenCalledOnce()
     await expect(f.coordinator.install('1.2.0')).rejects.toThrow(/not ready/u)
+  })
+
+  it('rejects a feed with no installer for the packaged target before downloading', async () => {
+    class DebUpdater extends EventEmitter {}
+    const f = fixture('nightly', '1.1.0-alpha.1', DebUpdater, {
+      version: '1.1.0-rc.2',
+      files: [{ url: 'deepseek-harness-1.1.0-rc.2-linux-x86_64.AppImage', sha512: 'appimage-sha512', size: 1 }],
+    })
+    await f.coordinator.check()
+    expect(await f.coordinator.download('1.1.0-rc.2')).toMatchObject({
+      phase: 'error',
+      failedOperation: 'download',
+      message: 'desktop update: the 1.1.0-rc.2 feed has no .deb artifact for this installation',
+    })
+    expect(f.downloadUpdate).not.toHaveBeenCalled()
+    expect(f.states.map(state => state.phase)).toEqual(['available', 'error'])
+  })
+
+  it('downloads when the feed advertises the packaged installer', async () => {
+    class DebUpdater extends EventEmitter {}
+    const f = fixture('nightly', '1.1.0-alpha.1', DebUpdater, {
+      version: '1.1.0-rc.2',
+      files: [
+        { url: 'deepseek-harness-1.1.0-rc.2-linux-x86_64.AppImage', sha512: 'appimage-sha512', size: 1 },
+        { url: 'deepseek-harness-1.1.0-rc.2-linux-amd64.deb?download=1', sha512: 'deb-sha512', size: 2 },
+      ],
+    })
+    await f.coordinator.check()
+    await f.coordinator.download('1.1.0-rc.2')
+    expect(f.downloadUpdate).toHaveBeenCalledOnce()
+    expect(f.coordinator.state).toEqual({ phase: 'ready', version: '1.1.0-rc.2' })
   })
 
   it('keeps automatic failures silent and exposes a manual caller joining the same check', async () => {

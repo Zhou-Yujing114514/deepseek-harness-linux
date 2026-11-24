@@ -4,6 +4,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { deflateRawSync, gzipSync } from 'node:zlib'
+import { load } from 'js-yaml'
+import { findFile, resolveFiles } from 'electron-updater/out/providers/Provider.js'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   channelManifest,
@@ -144,6 +146,39 @@ describe('self-hosted channel manifest', () => {
   it('omits blockMapSize for non-finite values', () => {
     expect(channelManifest(version, filename, digest, size, NaN)).not.toContain('blockMapSize')
     expect(channelManifest(version, filename, digest, size, undefined)).not.toContain('blockMapSize')
+  })
+
+  it('advertises the deb installer beside the AppImage', () => {
+    const deb = 'deepseek-harness-0.2.1-rc.2-linux-amd64.deb'
+    const debDigest = 'deb-sha512-placeholder'
+    const manifest = channelManifest(version, filename, digest, size, 123456, [
+      { filename: deb, digest: debDigest, size: 285633884 },
+    ])
+    const info = load(manifest) as {
+      files: Array<{ url: string; sha512: string; size: number }>
+      path: string
+      sha512: string
+      blockMapSize: number
+    }
+    expect(info.files).toEqual([
+      { url: filename, sha512: digest, size },
+      { url: deb, sha512: debDigest, size: 285633884 },
+    ])
+    // The primary AppImage keeps the deprecated top-level fields electron-updater reads.
+    expect(info.path).toBe(filename)
+    expect(info.sha512).toBe(digest)
+    expect(info.blockMapSize).toBe(123456)
+  })
+
+  it('lets DebUpdater select the deb entry from a published manifest', () => {
+    const deb = 'deepseek-harness-0.2.1-rc.2-linux-amd64.deb'
+    const manifest = channelManifest(version, filename, digest, size, undefined, [
+      { filename: deb, digest: 'deb-sha512-placeholder', size: 285633884 },
+    ])
+    const info = load(manifest) as Parameters<typeof resolveFiles>[0]
+    const selected = findFile(resolveFiles(info, new URL('https://updates.example.test/')), 'deb', ['AppImage', 'rpm', 'pacman'])
+    expect(selected?.info.url).toBe(deb)
+    expect(selected?.info.size).toBe(285633884)
   })
 })
 

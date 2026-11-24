@@ -11,10 +11,35 @@ import { DesktopUpdatePreparationError } from './update-error.ts'
 
 const { autoUpdater } = electronUpdater
 
+/**
+ * Artifact extension each platform updater selects from a feed. Keyed by class
+ * name because electron-updater chooses the class from the packaged target,
+ * not from the feed itself.
+ */
+const UPDATER_ARTIFACT_EXTENSION: Readonly<Record<string, string>> = {
+  AppImageUpdater: 'AppImage',
+  DebUpdater: 'deb',
+  RpmUpdater: 'rpm',
+  PacmanUpdater: 'pacman',
+  NsisUpdater: 'exe',
+  MacUpdater: 'zip',
+}
+
+/** File names a feed advertises. */
+function updaterArtifactNames(info: UpdateInfo): string[] {
+  return info.files.map(file => file.url)
+}
+
+/** Match an extension against a bare file name or an absolute URL, ignoring query strings. */
+function hasArtifactExtension(name: string, extension: string): boolean {
+  return name.replace(/[?#].*$/u, '').toLowerCase().endsWith(`.${extension.toLowerCase()}`)
+}
+
 /** Owns one updater target until its download and installation settle. */
 export class DesktopUpdateCoordinator {
   private current: DesktopUpdateState = { phase: 'idle' }
   private candidate: string | undefined
+  private updateInfo: UpdateInfo | undefined
   private downloaded = false
   private disposed = false
   private checkOperation: Promise<DesktopUpdateState> | undefined
@@ -108,8 +133,9 @@ export class DesktopUpdateCoordinator {
       this.assertLive()
       if (this.candidate === undefined) throw new Error('desktop update: no checked update is available')
       if (version !== this.candidate) throw new Error('desktop update: download confirmation is stale')
-      this.setState({ phase: 'downloading', version, percent: 0 })
       try {
+        this.assertDownloadableArtifact()
+        this.setState({ phase: 'downloading', version, percent: 0 })
         await this.updater.downloadUpdate()
         if (!this.downloaded) throw new Error('desktop update: platform preparation did not report readiness')
         this.downloadResult?.(true)
@@ -160,6 +186,17 @@ export class DesktopUpdateCoordinator {
     if (this.disposed) throw new Error('desktop update: coordinator is disposed')
   }
 
+  /**
+   * Reject a feed with no installer for this packaged target before electron-updater
+   * hands an undefined file entry to executeDownload() and raises a bare TypeError.
+   */
+  private assertDownloadableArtifact(): void {
+    const extension = UPDATER_ARTIFACT_EXTENSION[this.updater.constructor.name]
+    if (extension === undefined || this.updateInfo === undefined) return
+    if (updaterArtifactNames(this.updateInfo).some(name => hasArtifactExtension(name, extension))) return
+    throw new Error(`desktop update: the ${this.updateInfo.version} feed has no .${extension} artifact for this installation`)
+  }
+
   private setState(state: DesktopUpdateState): DesktopUpdateState {
     if (!this.disposed) {
       this.current = state
@@ -191,6 +228,7 @@ export class DesktopUpdateCoordinator {
       if (valid(version) === null) throw new Error('desktop update: feed version is invalid')
       if (this.channel === 'latest' && version.includes('-')) throw new Error('desktop update: latest feed contains a prerelease')
       this.candidate = result.isUpdateAvailable && gt(version, this.currentVersion()) ? version : undefined
+      this.updateInfo = this.candidate === undefined ? undefined : result.updateInfo
       return this.setState(this.candidate === undefined ? { phase: 'idle' } : { phase: 'available', version })
     } catch (error) {
       return this.failure(error, 'check')

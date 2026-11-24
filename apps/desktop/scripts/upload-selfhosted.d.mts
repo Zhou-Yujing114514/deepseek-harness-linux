@@ -5,13 +5,21 @@
  */
 export function parseRemoteListing(stdout: string): Map<string, number>
 
+/** One additional installer advertised beside the primary AppImage. */
+export interface ChannelManifestFile {
+  readonly filename: string
+  readonly digest: string
+  readonly size: number
+}
+
 /**
  * Render one channel manifest matching the electron-builder generic provider schema.
  * @param version - Product version the manifest advertises.
- * @param filename - Artifact file name the client should download.
- * @param digest - Base64 sha512 of the artifact.
- * @param size - Byte length of the artifact.
+ * @param filename - Primary AppImage file name the client should download.
+ * @param digest - Base64 sha512 of the AppImage.
+ * @param size - Byte length of the AppImage.
  * @param blockMapSize - Byte length of the companion `.blockmap`; enables differential updates.
+ * @param additionalFiles - deb/rpm/pacman installers the same version publishes.
  * @returns YAML manifest text for the generic provider.
  */
 export function channelManifest(
@@ -20,6 +28,7 @@ export function channelManifest(
   digest: string,
   size: number,
   blockMapSize?: number,
+  additionalFiles?: readonly ChannelManifestFile[],
 ): string
 
 /**
